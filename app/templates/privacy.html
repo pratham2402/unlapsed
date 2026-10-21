@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Privacy · Unlapsed{% endblock %}
+{% block content %}
+<section class="docket">
+  <div>
+    <div class="docket-kicker">Data control</div>
+    <h1>Your documents stay yours.</h1>
+  </div>
+  <div class="docket-side">
+    <div class="risk-label">The PDF is read in memory and deleted after extraction. Only structured fields are stored.</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">What is stored</h2>
+  </div>
+  <ul class="prose-list">
+    <li>Document type, issuer, holder name, last four digits, issue date, expiry date, and constraints.</li>
+    <li>Source excerpts and page numbers for each extracted fact, so every value can be checked.</li>
+    <li>Official requirement sources with the date they were checked.</li>
+    <li>The plan, tasks, and activity log.</li>
+  </ul>
+  <p class="muted">The uploaded PDF itself is not written to disk in the demo. Deletion removes the extracted record and its facts.</p>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Documents</h2>
+    <span class="section-note">{{ documents|length }} records</span>
+  </div>
+  {% if documents %}
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>Document</th>
+        <th>Expires</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in documents %}
+      <tr>
+        <td>
+          <a href="/documents/{{ doc.id }}">{{ doc.title }}</a>
+          <div class="mono muted">{{ doc.holder_name }} · {{ doc.document_number_last4 }}</div>
+        </td>
+        <td class="mono">{{ doc.expiry_date|datefmt }}</td>
+        <td>
+          <form method="post" action="/privacy/documents/{{ doc.id }}/delete" data-confirm="Delete this document and its extracted facts?">
+            <button class="btn btn-danger" type="submit" style="padding: 5px 9px; font-size: 10px;">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No documents stored.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Export and reset</h2>
+  </div>
+  <div class="btn-row">
+    <a class="btn btn-secondary" href="/privacy/export">Export as JSON</a>
+    <form method="post" action="/demo/reset" data-confirm="Reset the sample case and rebuild the plan?">
+      <button class="btn btn-danger" type="submit">Reset sample case</button>
+    </form>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Source mode</h2>
+  </div>
+  <table class="provenance">
+    <tbody>
+      <tr>
+        <td class="mono">Nebius Token Factory</td>
+        <td>{% if live_nebius %}Live model calls enabled{% else %}No key. Extraction uses the deterministic fallback.{% endif %}</td>
+      </tr>
+      <tr>
+        <td class="mono">Tavily</td>
+        <td>{% if live_tavily %}Live official-source verification enabled{% else %}No key. Requirements come from labelled sample data.{% endif %}</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

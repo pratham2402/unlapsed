@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Add a trip · Unlapsed{% endblock %}
+{% block content %}
+<section class="docket">
+  <div>
+    <div class="docket-kicker">New event</div>
+    <h1>Build the plan backward from a date.</h1>
+  </div>
+  <div class="docket-side">
+    <div class="risk-label">The agent will check official sources, rebuild the timeline, and prepare a packet.</div>
+  </div>
+</section>
+
+<section class="section">
+  <form class="form" method="post" action="/events">
+    <div class="field-row">
+      <label for="title">Event name</label>
+      <input id="title" name="title" type="text" placeholder="Trip to India" required>
+    </div>
+    <div class="field-row">
+      <label for="destination">Destination</label>
+      <input id="destination" name="destination" type="text" placeholder="Country or city">
+    </div>
+    <div class="two-col">
+      <div class="field-row">
+        <label for="depart_date">Departure</label>
+        <input id="depart_date" name="depart_date" type="date" required>
+      </div>
+      <div class="field-row">
+        <label for="return_date">Return</label>
+        <input id="return_date" name="return_date" type="date" required>
+      </div>
+    </div>
+    <div class="field-row">
+      <label for="notes">Notes (optional)</label>
+      <textarea id="notes" name="notes" placeholder="Context you want to keep with this event."></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn" type="submit">Create event and run agent</button>
+      <a class="btn btn-secondary" href="/">Cancel</a>
+    </div>
+  </form>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">What the agent will do</h2>
+  </div>
+  <ol class="prose-list">
+    <li>Read the documents already in the register.</li>
+    <li>Check the current official requirement and processing time for each document.</li>
+    <li>Apply the destination's validity rule and build a dependency order.</li>
+    <li>Price the cost of missing each deadline.</li>
+    <li>Generate the checklist, evidence citations, and packet.</li>
+  </ol>
+</section>
+{% endblock %}

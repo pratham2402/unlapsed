@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Unlapsed{% endblock %}
+{% block content %}
+<section class="docket">
+  <div>
+    <div class="docket-kicker">Sample case / {{ holder_name }}</div>
+    <div class="docket-statement">{{ headline }}</div>
+  </div>
+  <div class="docket-side">
+    <div class="risk-number">{% if plan %}{{ plan.risk_total_cents|usd }}{% else %}$0{% endif %}</div>
+    <div class="risk-label">at risk if the deadlines are missed</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Next actions</h2>
+    {% if plan %}<a class="section-note" href="/plans/{{ plan.id }}">Open the full plan</a>{% endif %}
+  </div>
+  <div class="actions">
+    {% for task in next_tasks %}
+    <a class="action {% if task.priority == 'critical' %}critical{% endif %}" href="/plans/{{ plan.id }}">
+      <span class="action-date">{{ task.due_date|datefmt("%d %b") }}</span>
+      <span class="action-title">{{ task.title }}</span>
+      <span class="action-meta">{{ task.cost_of_missing_cents|usd }} if missed</span>
+    </a>
+    {% endfor %}
+    {% if not next_tasks %}
+    <div class="empty">No open actions. Add a trip or upload a document to begin.</div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Document register</h2>
+    <a class="section-note" href="/documents">All documents</a>
+  </div>
+  {% if documents %}
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>Document</th>
+        <th>Holder</th>
+        <th>Expires</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in documents %}
+      <tr>
+        <td>
+          <a href="/documents/{{ doc.id }}">{{ doc.title }}</a>
+          <div class="mono muted">{{ doc.issuer }}</div>
+        </td>
+        <td>{{ doc.holder_name }}</td>
+        <td class="mono">{{ doc.expiry_date|datefmt }}</td>
+        <td>
+          <span class="stamp {{ doc.status_label|status_class }}">{{ doc.status_label }}</span>
+          {% if doc.id in conflict_doc_ids %}
+          <span class="stamp status-alert">trip conflict</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No documents yet. <a href="/documents">Upload a text PDF</a>.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Agent</h2>
+    <span class="section-note">{% if last_run %}Last run {{ last_run.started_at|datetimefmt }}{% endif %}</span>
+  </div>
+  <div class="packet">
+    <div>
+      <div class="evidence-title">
+        {% if last_run %}{{ last_run.summary }}{% else %}No agent run yet.{% endif %}
+      </div>
+      <div class="evidence-meta">
+        {% if last_run and last_run.changes %}
+          {{ last_run.changes|join(' ') }}
+        {% else %}
+          No requirement changes detected on the last run.
+        {% endif %}
+      </div>
+    </div>
+    <div class="btn-row">
+      {% if plan %}
+      <form method="post" action="/plans/{{ plan.id }}/run">
+        <button class="btn" type="submit">Run agent</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Official evidence</h2>
+    <span class="section-note">{{ requirements|length }} checks</span>
+  </div>
+  <div class="evidence">
+    {% for doc_type, req in requirements.items() %}
+    <div class="evidence-item">
+      <div>
+        <div class="evidence-title">
+          {{ req.title }}
+          <span class="stamp {{ req.status|status_class }}">{{ req.status|status_text }}</span>
+        </div>
+        <div class="evidence-meta">
+          Fee: {{ req.fee or 'Not stated' }} · Processing: {{ req.processing_time or 'Not stated' }} · Checked {{ req.checked_at|datefmt }}
+        </div>
+        {% if req.official_url %}
+        <div class="evidence-meta"><a href="{{ req.official_url }}" target="_blank" rel="noreferrer">{{ req.official_url }}</a></div>
+        {% else %}
+        <div class="evidence-meta">No official public source found. Verify manually.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% if not requirements %}
+    <div class="empty">No requirements checked yet.</div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Add a life event</h2>
+    <span class="section-note">The plan is built backward from the date.</span>
+  </div>
+  <div class="btn-row">
+    <a class="btn" href="/events/new">Add a trip</a>
+    <a class="btn btn-secondary" href="/documents">Upload a document</a>
+  </div>
+</section>
+{% endblock %}

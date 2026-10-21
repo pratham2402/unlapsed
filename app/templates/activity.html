@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Activity · Unlapsed{% endblock %}
+{% block content %}
+<section class="docket">
+  <div>
+    <div class="docket-kicker">Register</div>
+    <h1>What the agent did, and when.</h1>
+  </div>
+  <div class="docket-side">
+    <div class="risk-number">{{ runs|length }}</div>
+    <div class="risk-label">agent runs recorded</div>
+  </div>
+</section>
+
+{% if runs %}
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Recent runs</h2>
+    <span class="section-note">Manual and scheduled runs are recorded the same way.</span>
+  </div>
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>Started</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Summary</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td class="mono">{{ run.started_at|datetimefmt }}</td>
+        <td>{{ run.run_type }}</td>
+        <td><span class="stamp {{ run.status|status_class }}">{{ run.status }}</span></td>
+        <td>{{ run.summary or 'No summary' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Log</h2>
+    <span class="section-note">Newest first</span>
+  </div>
+  <div class="register">
+    {% for item in activities %}
+    <div class="register-row">
+      <div class="register-time">{{ item.created_at|datetimefmt }}</div>
+      <div class="register-kind">{{ item.kind }}</div>
+      <div>{{ item.message }}</div>
+    </div>
+    {% endfor %}
+    {% if not activities %}
+    <div class="empty">No activity yet. Run the agent to start the log.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

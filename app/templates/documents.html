@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Documents · Unlapsed{% endblock %}
+{% block content %}
+<section class="docket">
+  <div>
+    <div class="docket-kicker">Document register</div>
+    <h1>Everything that can expire.</h1>
+  </div>
+  <div class="docket-side">
+    <div class="risk-number">{{ documents|length }}</div>
+    <div class="risk-label">documents in the vault</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Add a document</h2>
+    <span class="section-note">Text-based PDFs only in this demo.</span>
+  </div>
+  <form class="upload" method="post" action="/documents/upload" enctype="multipart/form-data">
+    <div>
+      <div class="evidence-title">Upload a passport, license, policy, or certificate</div>
+      <div class="evidence-meta">The file is read in memory and deleted after extraction. Only structured fields are stored.</div>
+    </div>
+    <div class="btn-row">
+      <input type="file" name="file" accept="application/pdf" required aria-label="Choose a PDF">
+      <button class="btn" type="submit">Upload and extract</button>
+    </div>
+  </form>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Register</h2>
+    <span class="section-note">Extraction mode is shown for each document.</span>
+  </div>
+  {% if documents %}
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>Document</th>
+        <th>Type</th>
+        <th>Expires</th>
+        <th>Extraction</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in documents %}
+      <tr>
+        <td>
+          <a href="/documents/{{ doc.id }}">{{ doc.title }}</a>
+          <div class="mono muted">{{ doc.holder_name }} · {{ doc.document_number_last4 }}</div>
+        </td>
+        <td>{{ doc.doc_type|replace('_', ' ') }}</td>
+        <td class="mono">{{ doc.expiry_date|datefmt }}</td>
+        <td>
+          <span>{{ doc.extraction_mode|mode_text }}</span>
+          <div class="mono muted">{{ "%.0f"|format(doc.extraction_confidence * 100) }}% confidence</div>
+        </td>
+        <td><span class="stamp {{ doc.status_label|status_class }}">{{ doc.status_label }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No documents yet. Upload a text-based PDF to start the register.</div>
+  {% endif %}
+</section>
+{% endblock %}

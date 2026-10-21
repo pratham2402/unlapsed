@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}{{ plan.title }} · Unlapsed{% endblock %}
+{% block content %}
+<section class="docket">
+  <div>
+    <div class="docket-kicker">
+      Plan{% if event %} / {{ event.event_type|replace('_', ' ') }}{% endif %}
+    </div>
+    <h1>{{ plan.title }}</h1>
+    {% if event %}
+    <div class="muted" style="margin-top: 10px;">
+      {{ event.destination }} · {{ event.depart_date|datefmt }} to {{ event.return_date|datefmt }}
+    </div>
+    {% if event.notes %}
+    <p class="muted" style="max-width: 76ch; margin-top: 8px;">{{ event.notes }}</p>
+    {% endif %}
+    {% endif %}
+  </div>
+  <div class="docket-side">
+    <div class="risk-number">{{ plan.risk_total_cents|usd }}</div>
+    <div class="risk-label">at risk if the deadlines are missed</div>
+  </div>
+</section>
+
+<p style="max-width: 76ch;">{{ plan.summary }}</p>
+
+<div class="btn-row" style="margin-top: 20px;">
+  <form method="post" action="/plans/{{ plan.id }}/run">
+    <button class="btn" type="submit">Run agent</button>
+  </form>
+  {% if packet %}
+  <a class="btn btn-secondary" href="/plans/{{ plan.id }}/packet.pdf">Download packet</a>
+  {% endif %}
+  <a class="btn btn-secondary" href="/plans/{{ plan.id }}/calendar.ics">Add to calendar</a>
+</div>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Critical path</h2>
+    <span class="section-note">{{ blocking_tasks|length }} blocking tasks</span>
+  </div>
+  {% if blocking_tasks %}
+  <div class="timeline">
+    {% for task in blocking_tasks %}
+    <div class="timeline-row critical">
+      <div class="timeline-date">{{ task.due_date|datefmt("%d %b") }}</div>
+      <div class="timeline-spine"><div class="timeline-mark"></div></div>
+      <div class="timeline-body">
+        <div class="timeline-title">{{ task.title }}</div>
+        <div class="timeline-desc">{{ task.description }}</div>
+        <div class="timeline-meta">
+          {% if task.start_date %}<span>Start {{ task.start_date|datefmt("%d %b") }}</span>{% endif %}
+          <span>{{ task.priority }}</span>
+          <span>{{ task.cost_of_missing_cents|usd }} if missed</span>
+          {% if task.depends_on %}<span>Depends on: {{ task.depends_on|join(', ')|replace('_', ' ') }}</span>{% endif %}
+          {% if task.evidence_url %}<a href="{{ task.evidence_url }}" target="_blank" rel="noreferrer">Official source</a>{% endif %}
+          <form method="post" action="/tasks/{{ task.id }}/toggle" style="margin-left: auto;">
+            <button class="btn btn-secondary" type="submit" style="padding: 4px 8px; font-size: 10px;">
+              {% if task.status == 'done' %}Reopen{% else %}Mark done{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">No blocking tasks for this event.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Parallel risks</h2>
+    <span class="section-note">{{ parallel_tasks|length }} tasks that do not block the trip</span>
+  </div>
+  {% if parallel_tasks %}
+  <div class="timeline">
+    {% for task in parallel_tasks %}
+    <div class="timeline-row parallel">
+      <div class="timeline-date">{{ task.due_date|datefmt("%d %b") }}</div>
+      <div class="timeline-spine"><div class="timeline-mark"></div></div>
+      <div class="timeline-body">
+        <div class="timeline-title">{{ task.title }}</div>
+        <div class="timeline-desc">{{ task.description }}</div>
+        <div class="timeline-meta">
+          {% if task.start_date %}<span>Start {{ task.start_date|datefmt("%d %b") }}</span>{% endif %}
+          <span>{{ task.priority }}</span>
+          <span>{{ task.cost_of_missing_cents|usd }} if missed</span>
+          {% if task.evidence_url %}<a href="{{ task.evidence_url }}" target="_blank" rel="noreferrer">Official source</a>{% endif %}
+          <form method="post" action="/tasks/{{ task.id }}/toggle" style="margin-left: auto;">
+            <button class="btn btn-secondary" type="submit" style="padding: 4px 8px; font-size: 10px;">
+              {% if task.status == 'done' %}Reopen{% else %}Mark done{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">No parallel risks found.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Evidence</h2>
+    <span class="section-note">Every requirement is tied to a source.</span>
+  </div>
+  <div class="evidence">
+    {% for doc_type, req in requirements.items() %}
+    <div class="evidence-item">
+      <div>
+        <div class="evidence-title">
+          {{ req.title }}
+          <span class="stamp {{ req.status|status_class }}">{{ req.status|status_text }}</span>
+        </div>
+        <div class="evidence-meta">
+          Fee: {{ req.fee or 'Not stated' }} · Processing: {{ req.processing_time or 'Not stated' }}
+        </div>
+        <div class="evidence-meta">
+          Checked {{ req.checked_at|datefmt }} · Confidence {{ "%.0f"|format(req.confidence * 100) }}%
+        </div>
+        {% if req.official_url %}
+        <div class="evidence-meta"><a href="{{ req.official_url }}" target="_blank" rel="noreferrer">{{ req.official_url }}</a></div>
+        {% else %}
+        <div class="evidence-meta">No official public source found. Verify manually.</div>
+        {% endif %}
+        {% if req.source_excerpt %}
+        <div class="evidence-excerpt">“{{ req.source_excerpt[:260] }}”</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% if not requirements %}
+    <div class="empty">No requirements checked yet.</div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="packet">
+    <div>
+      <div class="evidence-title">Renewal packet</div>
+      <div class="evidence-meta">Checklist, form-ready data, evidence citations, and a cover letter. Generated from the current plan.</div>
+    </div>
+    <div class="btn-row">
+      {% if packet %}
+      <a class="btn" href="/plans/{{ plan.id }}/packet.pdf">Download packet</a>
+      {% else %}
+      <span class="muted">Run the agent to generate the packet.</span>
+      {% endif %}
+      <a class="btn btn-secondary" href="/plans/{{ plan.id }}/calendar.ics">Add to calendar</a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

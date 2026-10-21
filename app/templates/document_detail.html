@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }} · Unlapsed{% endblock %}
+{% block content %}
+<section class="docket">
+  <div>
+    <div class="docket-kicker">Document register / {{ document.doc_type|replace('_', ' ') }}</div>
+    <h1>{{ document.title }}</h1>
+  </div>
+  <div class="docket-side">
+    <span class="stamp {{ document.status_label|status_class }}">{{ document.status_label }}</span>
+    <div class="risk-label" style="margin-top: 10px;">Expires {{ document.expiry_date|datefmt }}</div>
+    {% if document.days_until_expiry is not none %}
+    <div class="risk-label">{{ document.days_until_expiry }} days from today</div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Extracted record</h2>
+    <span class="section-note">{{ document.extraction_mode|mode_text }} extraction · {{ "%.0f"|format(document.extraction_confidence * 100) }}% confidence</span>
+  </div>
+  <div class="facsimile">
+    <div class="facsimile-head">
+      <div class="facsimile-issuer">{{ document.issuer or 'Issuer not read' }}</div>
+      <div class="facsimile-title">{{ document.doc_type|replace('_', ' ') }}</div>
+    </div>
+    <div class="facsimile-fields">
+      <div class="field">
+        <div class="field-label">Holder</div>
+        <div class="field-value">{{ document.holder_name or 'Not read' }}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Document number</div>
+        <div class="field-value">{{ document.document_number_last4 or 'Not read' }}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Issued</div>
+        <div class="field-value">{{ document.issue_date|datefmt }}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Expires</div>
+        <div class="field-value">{{ document.expiry_date|datefmt }}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Renewal window</div>
+        <div class="field-value">{{ document.renewal_window_days }} days</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Source file</div>
+        <div class="field-value">{{ document.source_filename }}</div>
+      </div>
+      {% if document.constraints.get('continuing_education_hours') %}
+      <div class="field">
+        <div class="field-label">Continuing education</div>
+        <div class="field-value">{{ document.constraints.get('continuing_education_hours') }} hours</div>
+      </div>
+      {% endif %}
+      {% if document.constraints.get('min_validity_months_for_entry') %}
+      <div class="field">
+        <div class="field-label">Entry validity rule</div>
+        <div class="field-value">{{ document.constraints.get('min_validity_months_for_entry') }} months</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Provenance</h2>
+    <span class="section-note">Every fact points back to the line it came from.</span>
+  </div>
+  {% if facts %}
+  <table class="provenance">
+    <thead>
+      <tr>
+        <th>Fact</th>
+        <th>Value</th>
+        <th>Page</th>
+        <th>Source line</th>
+        <th>Confidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for fact in facts %}
+      <tr>
+        <td class="mono">{{ fact.key }}</td>
+        <td class="mono">{{ fact.value }}</td>
+        <td>{{ fact.source_page or 'n/a' }}</td>
+        <td class="excerpt">{{ fact.source_excerpt or 'No excerpt captured' }}</td>
+        <td class="mono">{{ "%.0f"|format(fact.confidence * 100) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No provenance records for this document.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Official requirement</h2>
+    <span class="section-note">{% if requirement %}Checked {{ requirement.checked_at|datefmt }}{% else %}Not checked yet{% endif %}</span>
+  </div>
+  {% if requirement %}
+  <div class="packet">
+    <div>
+      <div class="evidence-title">
+        {{ requirement.title }}
+        <span class="stamp {{ requirement.status|status_class }}">{{ requirement.status|status_text }}</span>
+      </div>
+      <div class="evidence-meta">Fee: {{ requirement.fee or 'Not stated' }}</div>
+      <div class="evidence-meta">Processing: {{ requirement.processing_time or 'Not stated' }}</div>
+      <div class="evidence-meta">Source: {{ requirement.source_title or 'None' }}</div>
+      {% if requirement.official_url %}
+      <div class="evidence-meta"><a href="{{ requirement.official_url }}" target="_blank" rel="noreferrer">{{ requirement.official_url }}</a></div>
+      {% else %}
+      <div class="evidence-meta">No official public source found. Verify manually.</div>
+      {% endif %}
+    </div>
+    <span class="stamp {{ requirement.status|status_class }}">{{ "%.0f"|format(requirement.confidence * 100) }}%</span>
+  </div>
+
+  <div class="two-col" style="margin-top: 18px;">
+    <div>
+      <h3>Required documents</h3>
+      {% if requirement.required_documents %}
+      <ul class="prose-list">
+        {% for item in requirement.required_documents %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">Not stated in the checked source.</p>
+      {% endif %}
+    </div>
+    <div>
+      <h3>Steps</h3>
+      {% if requirement.steps %}
+      <ol class="prose-list">
+        {% for step in requirement.steps %}<li>{{ step }}</li>{% endfor %}
+      </ol>
+      {% else %}
+      <p class="muted">Not stated in the checked source.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty">No requirement has been checked for this document type yet.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Actions</h2>
+    <span class="section-note">Deletion removes the extracted facts, not the original file.</span>
+  </div>
+  <div class="btn-row">
+    <a class="btn btn-secondary" href="/documents">Back to register</a>
+    {% if plan %}
+    <form method="post" action="/plans/{{ plan.id }}/run">
+      <button class="btn" type="submit">Run agent again</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/privacy/documents/{{ document.id }}/delete" data-confirm="Delete this document and its extracted facts?">
+      <button class="btn btn-danger" type="submit">Delete document</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

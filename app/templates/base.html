@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Unlapsed{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <a class="wordmark" href="/">
+        <span class="wordmark-main">Unlapsed</span>
+        <span class="wordmark-sub">Document renewal office</span>
+      </a>
+
+      <nav class="rail-nav" aria-label="Main">
+        <a class="tab {% if path == '/' %}active{% endif %}" href="/">Dashboard</a>
+        <a class="tab {% if path.startswith('/documents') %}active{% endif %}" href="/documents">Documents</a>
+        {% if plan %}
+          <a class="tab {% if path.startswith('/plans') %}active{% endif %}" href="/plans/{{ plan.id }}">Plan</a>
+        {% else %}
+          <a class="tab {% if path.startswith('/events') %}active{% endif %}" href="/events/new">Plan</a>
+        {% endif %}
+        <a class="tab {% if path.startswith('/activity') %}active{% endif %}" href="/activity">Activity</a>
+        <a class="tab {% if path.startswith('/privacy') %}active{% endif %}" href="/privacy">Privacy</a>
+      </nav>
+
+      <div class="rail-status">
+        <div class="rail-label">Case status</div>
+        <div class="rail-stat"><span>{{ documents|length }}</span> documents</div>
+        <div class="rail-stat"><span>{{ requirements|length }}</span> sources checked</div>
+        <div class="rail-stat"><span>{% if plan %}{{ plan.risk_total_cents|usd }}{% else %}$0{% endif %}</span> at risk</div>
+      </div>
+
+      <div class="rail-mode">
+        {% if live_nebius and live_tavily %}
+          <span class="dot live"></span>Live sources
+        {% else %}
+          <span class="dot sample"></span>Sample data
+        {% endif %}
+        <div class="rail-mode-note">
+          {% if not live_nebius %}Add NEBIUS_API_KEY for live extraction.{% endif %}
+          {% if not live_tavily %}Add TAVILY_API_KEY for live verification.{% endif %}
+          {% if live_nebius and live_tavily %}Every requirement is checked against the official source.{% endif %}
+        </div>
+      </div>
+
+      <div class="rail-footer">Not legal advice.</div>
+    </aside>
+
+    <main class="main">
+      <header class="topline">
+        <span class="case-no">Case file</span>
+        <span>{{ now|datefmt("%d %b %Y") }}</span>
+      </header>
+
+      {% if msg %}<div class="flash" role="status">{{ msg }}</div>{% endif %}
+      {% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+
+      {% block content %}{% endblock %}
+
+      <footer class="main-footer">
+        <span>Unlapsed · private document renewal</span>
+        <span>Not legal advice. Verify with the official source before submitting.</span>
+      </footer>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
