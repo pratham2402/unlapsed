@@ -4,6 +4,8 @@ MIT licensed. Built for the Nebius x NVIDIA Global AI Hackathon.
 
 Live demo: <https://unlapsed.onrender.com>
 
+Demo video: <https://www.youtube.com/watch?v=L7BMgVS_uLY>
+
 Unlapsed is a private renewal agent for the documents that decide whether you can travel, drive, work, or stay covered. It reads your documents, verifies the current official requirement, builds a dependency-aware plan backward from a life event, prices the cost of missing each deadline, and prepares the packet.
 
 Track: **Personal AI**.

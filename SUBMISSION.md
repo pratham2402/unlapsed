@@ -91,5 +91,5 @@ Nebius Token Factory, NVIDIA Nemotron, Tavily, FastAPI, SQLModel, SQLite, pypdf,
 
 - Repository: https://github.com/pratham2402/unlapsed
 - Demo: https://unlapsed.onrender.com
-- Video: add the YouTube URL
+- Video: https://www.youtube.com/watch?v=L7BMgVS_uLY
 - Feedback: see `FEEDBACK.md`
