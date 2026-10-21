@@ -15,11 +15,5 @@ services:
         value: nvidia/nemotron-3-super-120b-a12b
       - key: TAVILY_API_KEY
         sync: false
-      - key: LANGCHAIN_API_KEY
-        sync: false
-      - key: LANGCHAIN_PROJECT
-        value: unlapsed
-      - key: APP_BASE_URL
-        sync: false
       - key: DATABASE_URL
         value: sqlite:///data/unlapsed.db
