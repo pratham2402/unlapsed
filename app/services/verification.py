@@ -309,12 +309,29 @@ def verify_travel_rule(
         "official travel.state.gov"
     )
     try:
-        hits = searcher.search(
-            query, include_domains=TRAVEL_RULE_DOMAINS, max_results=8
+        primary_hits = _filter_allowed(
+            searcher.search(
+                query, include_domains=TRAVEL_RULE_DOMAINS, max_results=8
+            ),
+            TRAVEL_RULE_DOMAINS,
         )
-        hits = _filter_travel_pages(
-            _filter_allowed(hits, TRAVEL_RULE_DOMAINS), destination
-        )
+        destination_hits = _filter_travel_pages(primary_hits, destination)
+        if not any("month" in hit.content.lower() for hit in destination_hits):
+            validity_hits = _filter_travel_pages(
+                _filter_allowed(
+                    searcher.search(
+                        f"{destination} passport validity six months",
+                        include_domains=TRAVEL_RULE_DOMAINS,
+                        max_results=6,
+                    ),
+                    TRAVEL_RULE_DOMAINS,
+                ),
+                destination,
+            )
+            hits = _dedupe_hits(validity_hits + destination_hits + primary_hits)
+        else:
+            hits = _dedupe_hits(destination_hits + primary_hits)
+        hits = _filter_travel_pages(hits, destination)
         if not hits:
             extra = searcher.search(
                 secondary, include_domains=TRAVEL_RULE_DOMAINS, max_results=8
@@ -413,6 +430,13 @@ Sources:
     confidence = _clamp(payload.get("confidence", 0.6))
 
     candidates = _month_candidates(f"{rule_text} {chosen.content}")
+    if months is None and len(candidates) == 1:
+        months = next(iter(candidates))
+        if not rule_text or rule_text.lower().startswith("not stated"):
+            rule_text = _sentence_with_month(chosen.content) or (
+                f"The official source states a {months}-month validity period."
+            )
+        confidence = max(confidence, 0.65)
     mismatch = months is not None and bool(candidates) and months not in candidates
 
     status = "verified"
@@ -810,6 +834,13 @@ def _optional_bool(value: object) -> bool | None:
     if isinstance(value, int):
         return bool(value)
     return None
+
+
+def _sentence_with_month(text: str) -> str:
+    for sentence in re.split(r"(?<=[.!?])\s+", text or ""):
+        if "month" in sentence.lower():
+            return sentence.strip()[:240]
+    return ""
 
 
 def _month_candidates(text: str) -> set[int]:
