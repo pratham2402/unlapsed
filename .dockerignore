@@ -9,3 +9,4 @@ data/generated/
 data/uploads/
 shots/
 server.log
+!data/unlapsed.db

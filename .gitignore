@@ -12,3 +12,5 @@ data/generated/
 
 shots/
 data/*.db
+
+!data/unlapsed.db
