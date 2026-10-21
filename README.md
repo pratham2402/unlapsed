@@ -25,7 +25,7 @@ Most tools stop at a reminder. Unlapsed plans the chain, checks the current rule
 - Builds a dependency graph. Example: passport renewal, then the India e-Visa, then the final travel check.
 - Plans backward from the event date and compares standard versus expedited processing.
 - Prices the cost of missing each deadline and separates trip blockers from parallel risks.
-- Generates a PDF packet with the checklist, evidence citations, form-ready data, and a cover letter.
+- Generates a PDF packet with the checklist, evidence citations, form-ready data, and per-document cover letters.
 - Generates an `.ics` calendar file.
 - Runs on a schedule and records every change in an activity log.
 
@@ -49,7 +49,7 @@ The category has many trackers. The difference is the combination:
 
 1. **A chain, not a list.** The plan knows that the e-Visa depends on the new passport, and that the final check depends on both.
 2. **Evidence, not answers.** Every fee, processing time, and required document is tied to an official source with a checked date. The UI shows the source and the confidence.
-3. **A packet, not a reminder.** The agent assembles the checklist, form-ready data, cover letter, and calendar events.
+3. **A packet, not a reminder.** The agent assembles the checklist, form-ready data, per-document cover letters, and calendar events.
 4. **A visible refusal to guess.** Weak or missing evidence becomes `needs_manual_check`, not a fabricated deadline.
 
 The dates and dependency rules are deterministic code. The models extract fields, read official pages, and write explanations. The model does not decide the legal deadline.

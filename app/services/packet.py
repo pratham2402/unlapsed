@@ -131,17 +131,37 @@ def generate_packet(
     story.append(_table(document_rows, styles, widths=[1.3 * inch, 1.3 * inch, 2.1 * inch, 0.95 * inch, 0.95 * inch]))
     story.append(Spacer(1, 12))
 
-    story.append(Paragraph("Cover letter", styles["h2"]))
+    story.append(PageBreak())
+    story.append(Paragraph("Cover letters", styles["h2"]))
     story.append(
         Paragraph(
-            f"To the processing office,<br/><br/>"
-            f"I am submitting my renewal application for the documents listed above. "
-            f"I have attached the required supporting documents and the current fee. "
-            f"Please contact me if any item is missing or needs correction.<br/><br/>"
-            f"Sincerely,<br/>{_text(holder_name)}",
-            styles["body"],
+            "Each renewal goes to a different office. Use the matching letter below. "
+            "The India e-Visa is an online application, so it does not need a mailed cover letter.",
+            styles["small"],
         )
     )
+    story.append(Spacer(1, 8))
+    for document in documents:
+        issuer = document.issuer or "the issuing office"
+        number = (document.document_number_last4 or "").replace("•", "*")
+        number_text = f" (last four: {number})" if number else ""
+        story.append(
+            KeepTogether(
+                [
+                    Paragraph(_text(document.title), styles["h3"]),
+                    Paragraph(
+                        f"To: {_text(issuer)}<br/><br/>"
+                        f"I am submitting my renewal application for my {_text(document.title)}"
+                        f"{_text(number_text)}. I have attached the required supporting documents "
+                        f"and the current fee. Please contact me if any item is missing or needs "
+                        f"correction.<br/><br/>"
+                        f"Sincerely,<br/>{_text(holder_name)}",
+                        styles["body"],
+                    ),
+                    Spacer(1, 8),
+                ]
+            )
+        )
     story.append(PageBreak())
 
     story.append(Paragraph("Checklist", styles["h2"]))
