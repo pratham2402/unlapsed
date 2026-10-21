@@ -2,6 +2,8 @@
 
 MIT licensed. Built for the Nebius x NVIDIA Global AI Hackathon.
 
+Live demo: <https://unlapsed.onrender.com>
+
 Unlapsed is a private renewal agent for the documents that decide whether you can travel, drive, work, or stay covered. It reads your documents, verifies the current official requirement, builds a dependency-aware plan backward from a life event, prices the cost of missing each deadline, and prepares the packet.
 
 Track: **Personal AI**.
@@ -157,7 +159,9 @@ The repo includes a `Dockerfile`, `start.sh`, and `render.yaml`.
 3. Add `NEBIUS_API_KEY` and `TAVILY_API_KEY` as secret environment variables.
 4. Deploy. The first boot runs `scripts/bootstrap.py`, which seeds the demo only when the database is empty.
 
-The free plan uses an ephemeral disk. A cold start reseeds the demo, which is fine for judging. For a persistent deployment, attach a disk to `/app/data` or set `DATABASE_URL` to a Postgres database.
+The free plan uses an ephemeral disk. The image includes a pre-seeded SQLite file, so a cold start does not need the model APIs. The public demo runs with `DEMO_READ_ONLY=true`, which blocks uploads, event creation, agent runs, and deletes. This keeps a public URL from spending the sponsor credits. Run locally with your own keys to use the full interactive path.
+
+For a persistent deployment, attach a disk to `/app/data` or set `DATABASE_URL` to a Postgres database.
 
 ### Docker
 

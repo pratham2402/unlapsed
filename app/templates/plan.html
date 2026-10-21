@@ -25,9 +25,11 @@
 <p style="max-width: 76ch;">{{ plan.summary }}</p>
 
 <div class="btn-row" style="margin-top: 20px;">
+  {% if not settings.demo_read_only %}
   <form method="post" action="/plans/{{ plan.id }}/run">
     <button class="btn" type="submit">Run agent</button>
   </form>
+  {% endif %}
   {% if packet %}
   <a class="btn btn-secondary" href="/plans/{{ plan.id }}/packet.pdf">Download packet</a>
   {% endif %}
@@ -54,11 +56,13 @@
           <span>{{ task.cost_of_missing_cents|usd }} if missed</span>
           {% if task.depends_on %}<span>Depends on: {{ task.depends_on|join(', ')|replace('_', ' ') }}</span>{% endif %}
           {% if task.evidence_url %}<a href="{{ task.evidence_url }}" target="_blank" rel="noreferrer">Official source</a>{% endif %}
+          {% if not settings.demo_read_only %}
           <form method="post" action="/tasks/{{ task.id }}/toggle" style="margin-left: auto;">
             <button class="btn btn-secondary" type="submit" style="padding: 4px 8px; font-size: 10px;">
               {% if task.status == 'done' %}Reopen{% else %}Mark done{% endif %}
             </button>
           </form>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -88,11 +92,13 @@
           <span>{{ task.priority }}</span>
           <span>{{ task.cost_of_missing_cents|usd }} if missed</span>
           {% if task.evidence_url %}<a href="{{ task.evidence_url }}" target="_blank" rel="noreferrer">Official source</a>{% endif %}
+          {% if not settings.demo_read_only %}
           <form method="post" action="/tasks/{{ task.id }}/toggle" style="margin-left: auto;">
             <button class="btn btn-secondary" type="submit" style="padding: 4px 8px; font-size: 10px;">
               {% if task.status == 'done' %}Reopen{% else %}Mark done{% endif %}
             </button>
           </form>
+          {% endif %}
         </div>
       </div>
     </div>

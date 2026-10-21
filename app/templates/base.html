@@ -37,15 +37,21 @@
       </div>
 
       <div class="rail-mode">
-        {% if live_nebius and live_tavily %}
+        {% if settings.demo_read_only %}
+          <span class="dot live"></span>Pre-verified sample
+        {% elif live_nebius and live_tavily %}
           <span class="dot live"></span>Live sources
         {% else %}
           <span class="dot sample"></span>Sample data
         {% endif %}
         <div class="rail-mode-note">
-          {% if not live_nebius %}Add NEBIUS_API_KEY for live extraction.{% endif %}
-          {% if not live_tavily %}Add TAVILY_API_KEY for live verification.{% endif %}
-          {% if live_nebius and live_tavily %}Every requirement is checked against the official source.{% endif %}
+          {% if settings.demo_read_only %}
+            The public demo is read-only. Evidence was verified with the live APIs.
+          {% else %}
+            {% if not live_nebius %}Add NEBIUS_API_KEY for live extraction.{% endif %}
+            {% if not live_tavily %}Add TAVILY_API_KEY for live verification.{% endif %}
+            {% if live_nebius and live_tavily %}Every requirement is checked against the official source.{% endif %}
+          {% endif %}
         </div>
       </div>
 

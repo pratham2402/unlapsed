@@ -30,6 +30,8 @@ It builds a dependency-aware plan backward from a life event. The seeded case is
 
 It prices the cost of missing each deadline, generates a PDF packet with the checklist and form-ready data, and creates an `.ics` calendar file.
 
+The public demo is read-only and runs from a pre-seeded database, so it does not spend sponsor credits. The video shows the live extraction and verification, and the repository has the full interactive path.
+
 ## Why it is different
 
 - It plans a chain, not a list of dates.
@@ -88,6 +90,6 @@ Nebius Token Factory, NVIDIA Nemotron, Tavily, FastAPI, SQLModel, SQLite, pypdf,
 ## Links
 
 - Repository: https://github.com/pratham2402/unlapsed
-- Demo: add the public URL after deployment
+- Demo: https://unlapsed.onrender.com
 - Video: add the YouTube URL
 - Feedback: see `FEEDBACK.md`

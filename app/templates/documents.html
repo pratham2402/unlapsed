@@ -17,6 +17,9 @@
     <h2 class="section-title">Add a document</h2>
     <span class="section-note">Text-based PDFs only in this demo.</span>
   </div>
+  {% if settings.demo_read_only %}
+  <div class="empty">The public demo is read-only. Run the project locally to upload your own text PDF.</div>
+  {% else %}
   <form class="upload" method="post" action="/documents/upload" enctype="multipart/form-data">
     <div>
       <div class="evidence-title">Upload a passport, license, policy, or certificate</div>
@@ -27,6 +30,7 @@
       <button class="btn" type="submit">Upload and extract</button>
     </div>
   </form>
+  {% endif %}
 </section>
 
 <section class="section">

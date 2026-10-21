@@ -20,7 +20,9 @@ from app.models import (
 )
 from app.services.agent import run_agent
 from app.services.extraction import extract_document_from_bytes
-from app.services.verification import seed_fallback_requirements
+from app.services.packet import generate_packet
+from app.services.planner import get_active_plan
+from app.services.verification import get_latest_requirement, seed_fallback_requirements
 
 
 def seed_demo(session: Session, reset: bool = True) -> Plan | None:
@@ -98,6 +100,45 @@ def seed_demo(session: Session, reset: bool = True) -> Plan | None:
         .order_by(Plan.updated_at.desc(), Plan.id.desc())
     )
     return session.exec(statement).first()
+
+
+def ensure_packet(session: Session) -> None:
+    """Regenerate the packet from the stored plan without any model calls.
+
+    The public demo ships with a pre-seeded database and an empty generated
+    directory. This keeps the download working after a container restart.
+    """
+    settings = get_settings()
+    plan = get_active_plan(session, settings.demo_user_email)
+    if plan is None:
+        return
+
+    tasks = session.exec(
+        select(PlanTask).where(PlanTask.plan_id == plan.id).order_by(PlanTask.sort_order)
+    ).all()
+    documents = session.exec(
+        select(Document).where(Document.user_id == settings.demo_user_email)
+    ).all()
+    requirements = {}
+    for doc_type in (
+        "passport",
+        "india_evisa",
+        "driver_license",
+        "professional_license",
+        "renters_insurance",
+    ):
+        requirement = get_latest_requirement(session, doc_type)
+        if requirement is not None:
+            requirements[doc_type] = requirement
+
+    holder = next((doc.holder_name for doc in documents if doc.holder_name), "Alex Morgan")
+    path = generate_packet(plan, tasks, documents, requirements, holder)
+
+    existing = session.exec(select(Packet).where(Packet.plan_id == plan.id)).all()
+    for packet in existing:
+        session.delete(packet)
+    session.add(Packet(plan_id=plan.id, filename=path.name))
+    session.commit()
 
 
 def _clear(session: Session) -> None:

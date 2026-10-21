@@ -12,6 +12,9 @@
 </section>
 
 <section class="section">
+  {% if settings.demo_read_only %}
+  <div class="empty">The public demo is read-only. Run the project locally to add your own event.</div>
+  {% else %}
   <form class="form" method="post" action="/events">
     <div class="field-row">
       <label for="title">Event name</label>
@@ -40,6 +43,7 @@
       <a class="btn btn-secondary" href="/">Cancel</a>
     </div>
   </form>
+  {% endif %}
 </section>
 
 <section class="section">

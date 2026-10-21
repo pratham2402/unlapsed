@@ -157,6 +157,7 @@
   </div>
   <div class="btn-row">
     <a class="btn btn-secondary" href="/documents">Back to register</a>
+    {% if not settings.demo_read_only %}
     {% if plan %}
     <form method="post" action="/plans/{{ plan.id }}/run">
       <button class="btn" type="submit">Run agent again</button>
@@ -165,6 +166,7 @@
     <form method="post" action="/privacy/documents/{{ document.id }}/delete" data-confirm="Delete this document and its extracted facts?">
       <button class="btn btn-danger" type="submit">Delete document</button>
     </form>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

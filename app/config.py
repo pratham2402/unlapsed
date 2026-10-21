@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     app_secret_key: str = "change-me"
     database_url: str = f"sqlite:///{BASE_DIR / 'data' / 'unlapsed.db'}"
     demo_user_email: str = "alex@unlapsed.demo"
+    demo_read_only: bool = False
 
     nebius_api_key: str = ""
     nebius_base_url: str = "https://api.tokenfactory.nebius.com/v1/"

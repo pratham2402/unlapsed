@@ -11,6 +11,10 @@
   </div>
 </section>
 
+{% if settings.demo_read_only %}
+<div class="flash" role="status">The public demo is read-only. The sample data is pre-verified. Run the project locally to upload or delete documents.</div>
+{% endif %}
+
 <section class="section">
   <div class="section-head">
     <h2 class="section-title">What is stored</h2>
@@ -35,7 +39,7 @@
       <tr>
         <th>Document</th>
         <th>Expires</th>
-        <th>Delete</th>
+        {% if not settings.demo_read_only %}<th>Delete</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -46,11 +50,13 @@
           <div class="mono muted">{{ doc.holder_name }} · {{ doc.document_number_last4 }}</div>
         </td>
         <td class="mono">{{ doc.expiry_date|datefmt }}</td>
+        {% if not settings.demo_read_only %}
         <td>
           <form method="post" action="/privacy/documents/{{ doc.id }}/delete" data-confirm="Delete this document and its extracted facts?">
             <button class="btn btn-danger" type="submit" style="padding: 5px 9px; font-size: 10px;">Delete</button>
           </form>
         </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
@@ -62,13 +68,15 @@
 
 <section class="section">
   <div class="section-head">
-    <h2 class="section-title">Export and reset</h2>
+    <h2 class="section-title">{% if settings.demo_read_only %}Export{% else %}Export and reset{% endif %}</h2>
   </div>
   <div class="btn-row">
     <a class="btn btn-secondary" href="/privacy/export">Export as JSON</a>
+    {% if not settings.demo_read_only %}
     <form method="post" action="/demo/reset" data-confirm="Reset the sample case and rebuild the plan?">
       <button class="btn btn-danger" type="submit">Reset sample case</button>
     </form>
+    {% endif %}
   </div>
 </section>
 

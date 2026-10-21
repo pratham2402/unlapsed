@@ -111,6 +111,10 @@ templates.env.filters["status_text"] = _status_text
 templates.env.filters["mode_text"] = _mode_text
 
 
+def _read_only() -> bool:
+    return get_settings().demo_read_only
+
+
 def _context(request: Request, session: Session, **extra) -> dict:
     settings = get_settings()
     user_id = settings.demo_user_email
@@ -229,6 +233,11 @@ async def upload_document(
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
 ):
+    if _read_only():
+        return RedirectResponse(
+            "/documents?error=The+public+demo+is+read-only.+Run+the+project+locally+to+upload.",
+            status_code=303,
+        )
     if file.size and file.size > 10 * 1024 * 1024:
         return RedirectResponse("/documents?error=File+is+larger+than+10+MB", status_code=303)
     if not (file.filename or "").lower().endswith(".pdf"):
@@ -299,6 +308,11 @@ def create_event(
     notes: str = Form(""),
     session: Session = Depends(get_session),
 ):
+    if _read_only():
+        return RedirectResponse(
+            "/events/new?error=The+public+demo+is+read-only.+Run+the+project+locally+to+add+an+event.",
+            status_code=303,
+        )
     user_id = get_settings().demo_user_email
     try:
         depart = date.fromisoformat(depart_date) if depart_date else None
@@ -365,6 +379,11 @@ def plan_detail(plan_id: int, request: Request, session: Session = Depends(get_s
 
 @app.post("/plans/{plan_id}/run")
 def run_plan(plan_id: int, request: Request, session: Session = Depends(get_session)):
+    if _read_only():
+        return RedirectResponse(
+            f"/plans/{plan_id}?error=The+public+demo+is+read-only.",
+            status_code=303,
+        )
     if session.get(Plan, plan_id) is None:
         raise HTTPException(status_code=404, detail="Plan not found")
     run = run_agent(session, get_settings().demo_user_email, run_type="manual")
@@ -411,6 +430,11 @@ def toggle_task(task_id: int, session: Session = Depends(get_session)):
     task = session.get(PlanTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
+    if _read_only():
+        return RedirectResponse(
+            f"/plans/{task.plan_id}?error=The+public+demo+is+read-only.",
+            status_code=303,
+        )
     task.status = "todo" if task.status == "done" else "done"
     session.add(task)
     session.commit()
@@ -453,6 +477,11 @@ def delete_document(document_id: int, session: Session = Depends(get_session)):
     document = session.get(Document, document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    if _read_only():
+        return RedirectResponse(
+            "/privacy?error=The+public+demo+is+read-only.",
+            status_code=303,
+        )
     facts = session.exec(select(Fact).where(Fact.document_id == document.id)).all()
     for fact in facts:
         session.delete(fact)
@@ -517,6 +546,11 @@ def export_data(session: Session = Depends(get_session)):
 
 @app.post("/demo/reset")
 def reset_demo(session: Session = Depends(get_session)):
+    if _read_only():
+        return RedirectResponse(
+            "/privacy?error=The+public+demo+is+read-only.",
+            status_code=303,
+        )
     plan = seed_demo(session, reset=True)
     if plan is None:
         return RedirectResponse("/?error=Could+not+seed+the+demo", status_code=303)

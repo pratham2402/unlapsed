@@ -15,7 +15,7 @@ from sqlmodel import Session, select
 
 from app.db import engine, init_db
 from app.models import Document
-from app.services.demo import seed_demo
+from app.services.demo import ensure_packet, seed_demo
 
 
 def main() -> None:
@@ -26,6 +26,8 @@ def main() -> None:
             print(f"Seeded demo. Plan: {plan.title if plan else 'none'}")
         else:
             print("Database already has documents. Skipping seed.")
+        ensure_packet(session)
+        print("Packet ready.")
 
 
 if __name__ == "__main__":

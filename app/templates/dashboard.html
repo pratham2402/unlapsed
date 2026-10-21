@@ -26,7 +26,13 @@
     </a>
     {% endfor %}
     {% if not next_tasks %}
-    <div class="empty">No open actions. Add a trip or upload a document to begin.</div>
+    <div class="empty">
+      {% if settings.demo_read_only %}
+        No open actions in this pre-verified sample.
+      {% else %}
+        No open actions. Add a trip or upload a document to begin.
+      {% endif %}
+    </div>
     {% endif %}
   </div>
 </section>
@@ -89,10 +95,12 @@
       </div>
     </div>
     <div class="btn-row">
-      {% if plan %}
+      {% if not settings.demo_read_only and plan %}
       <form method="post" action="/plans/{{ plan.id }}/run">
         <button class="btn" type="submit">Run agent</button>
       </form>
+      {% elif settings.demo_read_only %}
+      <span class="muted">Read-only public demo.</span>
       {% endif %}
     </div>
   </div>
@@ -133,9 +141,13 @@
     <h2 class="section-title">Add a life event</h2>
     <span class="section-note">The plan is built backward from the date.</span>
   </div>
+  {% if settings.demo_read_only %}
+  <div class="empty">The public demo is read-only. Run the project locally to add your own event or document.</div>
+  {% else %}
   <div class="btn-row">
     <a class="btn" href="/events/new">Add a trip</a>
     <a class="btn btn-secondary" href="/documents">Upload a document</a>
   </div>
+  {% endif %}
 </section>
 {% endblock %}
