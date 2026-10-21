@@ -35,8 +35,8 @@ The seeded case is a synthetic US professional with four generated, text-based d
 
 - The passport expires on 14 June 2027.
 - India requires six months of passport validity beyond the return date, so the passport must be valid through 24 July 2027.
-- Standard passport processing would have to start on 24 October 2026, which is three days after the seeded "today."
-- The agent recommends deciding on standard versus expedited processing immediately, then renewing the passport, then applying for the e-Visa.
+- The current official processing time is 4 to 6 weeks routine, so the standard renewal starts on 7 November 2026 and is due on 19 December 2026.
+- The agent then schedules the e-Visa and the final travel check.
 - The renters policy expires on 1 January 2027, before departure, so it is a parallel risk.
 - The professional license expires on 31 March 2027 and needs 30 continuing education hours, so it is a second parallel risk.
 - The total at risk is $7,700.
@@ -180,7 +180,7 @@ The shot-by-shot recording script, including the voiceover lines and the on-scre
 
 1. Dashboard: the headline, the $7,700 risk, and the next actions.
 2. Passport detail: the extracted record, the provenance table, and the official requirement.
-3. Plan: the critical path, the standard versus expedited decision, and the evidence panel.
+3. Plan: the critical path, the passport task with its standard processing margin, and the evidence panel.
 4. Activity: run the agent and show the new verification entries and the plan update in the log.
 5. Download the packet and the calendar file.
 6. Privacy: show what is stored and what is not.
@@ -236,12 +236,14 @@ The suite covers date parsing, sample extraction, low-text rejection, the six-mo
 
 - [x] Working project on Nebius Token Factory and an NVIDIA open-source model
 - [x] Personal AI track fit: persistent memory, reusable skills, tool access, always-on, data control
-- [ ] Push the repository to GitHub and make it public
-- [ ] Add the public repository URL and the MIT license in the About section
-- [ ] Add live Nebius and Tavily keys and verify the live demo path
-- [ ] Deploy the demo and add the public URL
-- [ ] Record the three-minute YouTube video
-- [ ] Write the feedback for Nebius, NVIDIA, and Tavily
+- [x] Push the repository to GitHub and make it public
+- [x] Add the public repository URL and the MIT license in the About section
+- [x] Verify the live Nebius and Tavily path in development
+- [x] Deploy the demo and add the public URL
+- [x] Record the YouTube video under three minutes
+- [x] Write the feedback for Nebius, NVIDIA, and Tavily
+
+The public Render demo is read-only and pre-seeded to protect the API credits. Run the project locally to exercise the live Nebius and Tavily path.
 
 ## License
 
