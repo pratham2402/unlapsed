@@ -150,6 +150,8 @@ The repo includes a `Dockerfile`, `start.sh`, and `render.yaml`.
 
 ### Render
 
+[Deploy to Render](https://render.com/deploy?repo=https://github.com/pratham2402/unlapsed)
+
 1. Push the repository to GitHub.
 2. In Render, create a new Web Service from the repository. Render reads `render.yaml`.
 3. Add `NEBIUS_API_KEY` and `TAVILY_API_KEY` as secret environment variables.
