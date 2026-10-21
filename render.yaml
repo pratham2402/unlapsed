@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: unlapsed
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NEBIUS_API_KEY
+        sync: false
+      - key: NEBIUS_BASE_URL
+        value: https://api.tokenfactory.nebius.com/v1/
+      - key: NEBIUS_MODEL_FAST
+        value: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
+      - key: NEBIUS_MODEL_REASONING
+        value: nvidia/nemotron-3-super-120b-a12b
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LANGCHAIN_API_KEY
+        sync: false
+      - key: LANGCHAIN_PROJECT
+        value: unlapsed
+      - key: APP_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///data/unlapsed.db
