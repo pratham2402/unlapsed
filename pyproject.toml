@@ -1,0 +1,21 @@
+[project]
+name = "unlapsed"
+version = "0.1.0"
+description = "Unlapsed: a private document renewal agent for the Nebius x NVIDIA hackathon"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.156.8",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "langsmith>=0.14.11",
+    "openai>=3.35.1",
+    "pydantic-settings>=2.16.1",
+    "pypdf>=6.21.1",
+    "pytest>=9.1.1",
+    "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.32",
+    "reportlab>=5.0.1",
+    "sqlmodel>=0.0.48",
+    "tavily-python>=0.8.5",
+    "uvicorn[standard]>=0.54.0",
+]

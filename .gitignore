@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+data/unlapsed.db
+data/uploads/
+data/generated/
+.langsmith/
+.DS_Store
+*.log
+
+shots/
+data/*.db
