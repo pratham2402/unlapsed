@@ -73,7 +73,8 @@ def generate_packet(
     story.append(Spacer(1, 8))
     story.append(
         Paragraph(
-            f"Risk if ignored: <b>${plan.risk_total_usd:,.0f}</b> across the critical path and parallel risks.",
+            f"Estimated risk if ignored: <b>${plan.risk_total_usd:,.0f}</b> across the critical path and parallel risks. "
+            "Dollar figures are planning assumptions, not quotes.",
             styles["body"],
         )
     )
@@ -91,7 +92,7 @@ def generate_packet(
                 f"${task.cost_of_missing_usd:,.0f}",
             ]
         )
-    story.append(_table(critical_rows, styles, widths=[2.7 * inch, 0.8 * inch, 0.8 * inch, 0.7 * inch, 0.9 * inch]))
+    story.append(_table(critical_rows, styles, widths=[2.8 * inch, 1.05 * inch, 1.05 * inch, 0.8 * inch, 1.0 * inch]))
     story.append(Spacer(1, 12))
 
     story.append(Paragraph("Official evidence", styles["h2"]))
@@ -112,7 +113,7 @@ def generate_packet(
                 _date(requirement.checked_at.date()),
             ]
         )
-    story.append(_table(evidence_rows, styles, widths=[1.5 * inch, 1.3 * inch, 1.5 * inch, 1.8 * inch, 0.7 * inch]))
+    story.append(_table(evidence_rows, styles, widths=[1.4 * inch, 1.2 * inch, 1.5 * inch, 1.7 * inch, 0.95 * inch]))
     story.append(PageBreak())
 
     story.append(Paragraph("Form-ready data", styles["h2"]))
@@ -127,7 +128,7 @@ def generate_packet(
                 (document.document_number_last4 or "").replace("•", "*"),
             ]
         )
-    story.append(_table(document_rows, styles, widths=[1.4 * inch, 1.4 * inch, 2.2 * inch, 0.8 * inch, 0.9 * inch]))
+    story.append(_table(document_rows, styles, widths=[1.3 * inch, 1.3 * inch, 2.1 * inch, 0.95 * inch, 0.95 * inch]))
     story.append(Spacer(1, 12))
 
     story.append(Paragraph("Cover letter", styles["h2"]))

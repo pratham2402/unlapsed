@@ -41,6 +41,8 @@ The seeded case is a synthetic US professional with four generated, text-based d
 - The professional license expires on 31 March 2027 and needs 30 continuing education hours, so it is a second parallel risk.
 - The total at risk is $7,700.
 
+The dollar risk figures are sample planning assumptions, not quotes. The official renewal fees are shown separately in the evidence panel.
+
 ## Why this is not another expiry tracker
 
 The category has many trackers. The difference is the combination:

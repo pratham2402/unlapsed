@@ -30,6 +30,8 @@ It builds a dependency-aware plan backward from a life event. The seeded case is
 
 It prices the cost of missing each deadline, generates a PDF packet with the checklist and form-ready data, and creates an `.ics` calendar file.
 
+The dollar risk figures are sample planning assumptions, not quotes. The official renewal fees are shown separately in the evidence panel.
+
 The public demo is read-only and runs from a pre-seeded database, so it does not spend sponsor credits. The video shows the live extraction and verification, and the repository has the full interactive path.
 
 ## Why it is different
