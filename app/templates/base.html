@@ -38,7 +38,7 @@
 
       <div class="rail-mode">
         {% if settings.demo_read_only %}
-          <span class="dot live"></span>Pre-verified sample
+          <span class="dot sample"></span>Sample data
         {% elif live_nebius and live_tavily %}
           <span class="dot live"></span>Live sources
         {% else %}
@@ -46,7 +46,7 @@
         {% endif %}
         <div class="rail-mode-note">
           {% if settings.demo_read_only %}
-            The public demo is read-only. Evidence was verified with the live APIs.
+            The public demo is read-only and runs without API keys. Evidence is labelled sample or verify manually. The video shows the live path.
           {% else %}
             {% if not live_nebius %}Add NEBIUS_API_KEY for live extraction.{% endif %}
             {% if not live_tavily %}Add TAVILY_API_KEY for live verification.{% endif %}

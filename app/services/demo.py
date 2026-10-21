@@ -84,12 +84,11 @@ def seed_demo(session: Session, reset: bool = True) -> Plan | None:
 
     event = Event(
         user_id=user_id,
-        event_type="trip",
+        event_type="auto",
         title="Trip to India",
         destination="India",
         destination_country="India",
         home_location="United States",
-        is_international=True,
         depart_date=date(2027, 1, 10),
         return_date=date(2027, 1, 24),
         notes="Two-week trip. Non-refundable flights and hotels.",

@@ -104,9 +104,21 @@ def infer_event(documents: list[Document], event: Event) -> EventAnalysis:
     client = NebiusClient()
     if client.available:
         try:
-            return _infer_with_model(client, documents, event, home, explicit_type)
+            return _infer_with_model(
+                client, documents, event, home, explicit_type, client.fast_model
+            )
         except (NebiusError, ValueError, KeyError, TypeError):
-            pass
+            try:
+                return _infer_with_model(
+                    client,
+                    documents,
+                    event,
+                    home,
+                    explicit_type,
+                    client.reasoning_model,
+                )
+            except (NebiusError, ValueError, KeyError, TypeError):
+                pass
 
     return _fallback_analysis(documents, event, explicit_type, home)
 
@@ -176,6 +188,7 @@ def _infer_with_model(
     event: Event,
     home: str,
     explicit_type: str,
+    model: str,
 ) -> EventAnalysis:
     document_lines = []
     for document in documents:
@@ -243,8 +256,8 @@ Documents:
             "You classify events for a document renewal planner. Return strict JSON only. "
             "Do not invent documents or dates."
         ),
-        model=client.fast_model,
-        max_tokens=900,
+        model=model,
+        max_tokens=1200,
     )
     return _normalise_payload(payload, documents, event, home, explicit_type)
 
@@ -295,6 +308,8 @@ def _normalise_payload(
     relevant = _add_expiring_documents(relevant, documents, event)
 
     confidence = _clamp(payload.get("confidence", 0.5))
+    if confidence <= 0.0:
+        confidence = 0.6
     if event_type == "other" and confidence > 0.6:
         confidence = 0.6
 
