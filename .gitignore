@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .env
-data/unlapsed.db
 data/uploads/
 data/generated/
 .langsmith/
@@ -12,5 +11,3 @@ data/generated/
 
 shots/
 data/*.db
-
-!data/unlapsed.db

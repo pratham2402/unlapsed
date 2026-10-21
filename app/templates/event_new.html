@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Add a trip · Unlapsed{% endblock %}
+{% block title %}Add an event · Unlapsed{% endblock %}
 {% block content %}
 <section class="docket">
   <div>
@@ -17,27 +17,51 @@
   {% else %}
   <form class="form" method="post" action="/events">
     <div class="field-row">
-      <label for="title">Event name</label>
-      <input id="title" name="title" type="text" placeholder="Trip to India" required>
+      <label for="title">What is happening?</label>
+      <input id="title" name="title" type="text" placeholder="Road trip to Big Sur" required>
     </div>
     <div class="field-row">
-      <label for="destination">Destination</label>
-      <input id="destination" name="destination" type="text" placeholder="Country or city">
+      <label for="destination">Destination or location</label>
+      <input id="destination" name="destination" type="text" placeholder="Country, city, or route">
+    </div>
+    <div class="field-row">
+      <label for="destination_country">Destination country</label>
+      <input id="destination_country" name="destination_country" type="text" placeholder="France, India, United States">
+      <span class="field-help">Optional. The agent infers it when possible, but a country makes the visa and passport rule check more reliable.</span>
+    </div>
+    <div class="field-row">
+      <label for="home_location">Home location</label>
+      <input id="home_location" name="home_location" type="text" value="{{ suggested_home }}" placeholder="Country or state where you live">
+      <span class="field-help">The agent uses this to tell domestic from international. It is inferred from your documents when possible.</span>
     </div>
     <div class="two-col">
       <div class="field-row">
-        <label for="depart_date">Departure</label>
+        <label for="depart_date">Start date</label>
         <input id="depart_date" name="depart_date" type="date" required>
       </div>
       <div class="field-row">
-        <label for="return_date">Return</label>
+        <label for="return_date">End date</label>
         <input id="return_date" name="return_date" type="date" required>
       </div>
     </div>
     <div class="field-row">
       <label for="notes">Notes (optional)</label>
-      <textarea id="notes" name="notes" placeholder="Context you want to keep with this event."></textarea>
+      <textarea id="notes" name="notes" placeholder="Context the agent should know. It will read the event and choose the plan style."></textarea>
     </div>
+    <details class="form-details">
+      <summary>Override the plan style (optional)</summary>
+      <div class="field-row">
+        <label for="event_type">Plan style</label>
+        <select id="event_type" name="event_type">
+          <option value="auto" selected>Let the agent decide</option>
+          <option value="trip">International trip</option>
+          <option value="road_trip">Domestic travel</option>
+          <option value="move">Move</option>
+          <option value="job_start">Job start</option>
+          <option value="other">Other dated event</option>
+        </select>
+      </div>
+    </details>
     <div class="btn-row">
       <button class="btn" type="submit">Create event and run agent</button>
       <a class="btn btn-secondary" href="/">Cancel</a>
@@ -51,11 +75,11 @@
     <h2 class="section-title">What the agent will do</h2>
   </div>
   <ol class="prose-list">
-    <li>Read the documents already in the register.</li>
-    <li>Check the current official requirement and processing time for each document.</li>
-    <li>Apply the destination's validity rule and build a dependency order.</li>
-    <li>Price the cost of missing each deadline.</li>
-    <li>Generate the checklist, evidence citations, and packet.</li>
+    <li>Read the event and the documents already in the register.</li>
+    <li>Infer whether the event is domestic or international and which documents can affect it.</li>
+    <li>Check the current official requirement, including the destination's passport validity rule.</li>
+    <li>Apply the verified rule and build a dependency order.</li>
+    <li>Mark what blocks the event, separate the parallel risks, and generate the checklist, evidence citations, and packet.</li>
   </ol>
 </section>
 {% endblock %}

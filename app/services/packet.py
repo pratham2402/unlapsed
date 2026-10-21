@@ -21,7 +21,7 @@ from reportlab.platypus import (
 )
 
 from app.config import get_settings
-from app.models import Document, Plan, PlanTask, Requirement
+from app.models import Document, Plan, PlanTask, Requirement, TravelRule
 
 INK = colors.HexColor("#141414")
 PAPER = colors.HexColor("#F4F1EA")
@@ -37,6 +37,7 @@ def generate_packet(
     documents: list[Document],
     requirements: dict[str, Requirement],
     holder_name: str = "Alex Morgan",
+    travel_rule: TravelRule | None = None,
 ) -> Path:
     settings = get_settings()
     settings.ensure_dirs()
@@ -73,15 +74,15 @@ def generate_packet(
     story.append(Spacer(1, 8))
     story.append(
         Paragraph(
-            f"Estimated risk if ignored: <b>${plan.risk_total_usd:,.0f}</b> across the critical path and parallel risks. "
-            "Dollar figures are planning assumptions, not quotes.",
-            styles["body"],
+            "Official renewal fees are shown in the evidence table. "
+            "This packet does not estimate trip losses or other personal costs.",
+            styles["small"],
         )
     )
     story.append(PageBreak())
 
     story.append(Paragraph("Plan at a glance", styles["h2"]))
-    critical_rows = [["Task", "Start", "Due", "Blocking", "Cost if missed"]]
+    critical_rows = [["Task", "Start", "Due", "Blocking"]]
     for task in tasks:
         critical_rows.append(
             [
@@ -89,10 +90,9 @@ def generate_packet(
                 _date(task.start_date),
                 _date(task.due_date),
                 "Yes" if task.blocking else "No",
-                f"${task.cost_of_missing_usd:,.0f}",
             ]
         )
-    story.append(_table(critical_rows, styles, widths=[2.8 * inch, 1.05 * inch, 1.05 * inch, 0.8 * inch, 1.0 * inch]))
+    story.append(_table(critical_rows, styles, widths=[3.2 * inch, 1.2 * inch, 1.2 * inch, 1.0 * inch]))
     story.append(Spacer(1, 12))
 
     story.append(Paragraph("Official evidence", styles["h2"]))
@@ -114,6 +114,51 @@ def generate_packet(
             ]
         )
     story.append(_table(evidence_rows, styles, widths=[1.4 * inch, 1.2 * inch, 1.5 * inch, 1.7 * inch, 0.95 * inch]))
+    if travel_rule is not None:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Passport validity rule", styles["h3"]))
+        if travel_rule.passport_validity_months is None:
+            rule_value = "No verified period. Verify it manually."
+        elif travel_rule.passport_validity_months == 0:
+            rule_value = "Valid through the return date. No extra months."
+        else:
+            rule_value = f"{travel_rule.passport_validity_months} months beyond the return date."
+        if travel_rule.status != "verified":
+            rule_value += " Needs manual confirmation."
+        story.append(
+            Paragraph(
+                f"{_text(travel_rule.rule_text)} {_text(rule_value)}",
+                styles["body"],
+            )
+        )
+        if travel_rule.visa_required is True:
+            visa_value = travel_rule.visa_type or "Visa required"
+        elif travel_rule.visa_required is False:
+            visa_value = "No visa required according to the source."
+        else:
+            visa_value = "Visa requirement not stated in the source."
+        story.append(
+            Paragraph(
+                f"Visa: {_text(visa_value)} {_text(travel_rule.visa_rule_text)}",
+                styles["small"],
+            )
+        )
+        if travel_rule.source_url:
+            story.append(
+                Paragraph(
+                    f'Source: <link href="{html.escape(travel_rule.source_url, quote=True)}" color="#1F6F4A">'
+                    f"{_text(_short_url(travel_rule.source_url))}</link>, checked "
+                    f"{_date(travel_rule.checked_at.date())}.",
+                    styles["small"],
+                )
+            )
+        else:
+            story.append(
+                Paragraph(
+                    "No official source stored. Verify this rule manually.",
+                    styles["small"],
+                )
+            )
     story.append(PageBreak())
 
     story.append(Paragraph("Form-ready data", styles["h2"]))
@@ -131,37 +176,40 @@ def generate_packet(
     story.append(_table(document_rows, styles, widths=[1.3 * inch, 1.3 * inch, 2.1 * inch, 0.95 * inch, 0.95 * inch]))
     story.append(Spacer(1, 12))
 
-    story.append(PageBreak())
-    story.append(Paragraph("Cover letters", styles["h2"]))
-    story.append(
-        Paragraph(
-            "Each renewal goes to a different office. Use the matching letter below. "
-            "The India e-Visa is an online application, so it does not need a mailed cover letter.",
-            styles["small"],
-        )
-    )
-    story.append(Spacer(1, 8))
-    for document in documents:
-        issuer = document.issuer or "the issuing office"
-        number = (document.document_number_last4 or "").replace("•", "*")
-        number_text = f" (last four: {number})" if number else ""
+    renewal_document_ids = {task.document_id for task in tasks if task.document_id is not None}
+    cover_documents = [document for document in documents if document.id in renewal_document_ids]
+    if cover_documents:
+        story.append(PageBreak())
+        story.append(Paragraph("Cover letters", styles["h2"]))
         story.append(
-            KeepTogether(
-                [
-                    Paragraph(_text(document.title), styles["h3"]),
-                    Paragraph(
-                        f"To: {_text(issuer)}<br/><br/>"
-                        f"I am submitting my renewal application for my {_text(document.title)}"
-                        f"{_text(number_text)}. I have attached the required supporting documents "
-                        f"and the current fee. Please contact me if any item is missing or needs "
-                        f"correction.<br/><br/>"
-                        f"Sincerely,<br/>{_text(holder_name)}",
-                        styles["body"],
-                    ),
-                    Spacer(1, 8),
-                ]
+            Paragraph(
+                "Each renewal goes to a different office. Use the matching letter below. "
+                "Online applications do not need a mailed cover letter.",
+                styles["small"],
             )
         )
+        story.append(Spacer(1, 8))
+        for document in cover_documents:
+            issuer = document.issuer or "the issuing office"
+            number = (document.document_number_last4 or "").replace("•", "*")
+            number_text = f" (last four: {number})" if number else ""
+            story.append(
+                KeepTogether(
+                    [
+                        Paragraph(_text(document.title), styles["h3"]),
+                        Paragraph(
+                            f"To: {_text(issuer)}<br/><br/>"
+                            f"I am submitting my renewal application for my {_text(document.title)}"
+                            f"{_text(number_text)}. I have attached the required supporting documents "
+                            f"and the current fee. Please contact me if any item is missing or needs "
+                            f"correction.<br/><br/>"
+                            f"Sincerely,<br/>{_text(holder_name)}",
+                            styles["body"],
+                        ),
+                        Spacer(1, 8),
+                    ]
+                )
+            )
     story.append(PageBreak())
 
     story.append(Paragraph("Checklist", styles["h2"]))
@@ -173,8 +221,7 @@ def generate_packet(
                     Paragraph(_text(task.description), styles["body"]),
                     Paragraph(
                         f"{task.phase} · due {_date(task.due_date)} · "
-                        f"{'blocking' if task.blocking else 'parallel'} · "
-                        f"${task.cost_of_missing_usd:,.0f} if missed",
+                        f"{'blocking' if task.blocking else 'parallel'}",
                         styles["small"],
                     ),
                     Spacer(1, 8),
@@ -221,7 +268,7 @@ def generate_calendar(plan: Plan, tasks: list[PlanTask]) -> str:
         end = task.due_date
         description = (
             f"{task.description} Priority: {task.priority}. "
-            f"Cost if missed: ${task.cost_of_missing_usd:,.0f}."
+            f"{'Blocks the event' if task.blocking else 'Parallel risk'}."
         )
         lines.extend(
             [

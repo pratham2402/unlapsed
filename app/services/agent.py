@@ -13,18 +13,23 @@ from app.models import (
     PlanTask,
     Requirement,
 )
+from app.services.event_analysis import infer_event
 from app.services.packet import generate_packet
 from app.services.planner import (
-    build_trip_plan,
+    build_event_plan,
     get_active_plan,
     get_latest_event,
     persist_plan,
+    required_doc_types,
 )
 from app.services.verification import (
     get_latest_requirement,
+    get_latest_travel_rule,
     seed_fallback_requirements,
     upsert_requirement,
+    upsert_travel_rule,
     verify_requirement,
+    verify_travel_rule,
 )
 from app.services.tavily import TavilySearch
 
@@ -97,23 +102,78 @@ def _execute(
         session.commit()
         session.refresh(event)
 
+    analysis = None
+    travel_rule = None
+    if event.event_type != "watch":
+        analysis = infer_event(documents, event)
+        _apply_analysis(session, event, analysis)
+        travel_destination = event.destination_country or event.destination
+        if event.event_type == "trip" and travel_destination:
+            previous_rule = get_latest_travel_rule(session, travel_destination)
+            travel_data = verify_travel_rule(travel_destination, event.home_location)
+            if (
+                previous_rule is not None
+                and previous_rule.status == "verified"
+                and travel_data.status == "needs_manual_check"
+            ):
+                travel_rule = previous_rule
+            else:
+                travel_rule = upsert_travel_rule(session, travel_data)
+
     requirements, changes = _refresh_requirements(session, documents, event)
-    draft = build_trip_plan(documents, requirements, event)
+    draft = build_event_plan(
+        documents,
+        requirements,
+        event,
+        travel_rule=travel_rule,
+    )
     plan = persist_plan(session, user_id, event, draft)
 
     holder = next((doc.holder_name for doc in documents if doc.holder_name), "Alex Morgan")
-    packet_path = generate_packet(plan, _tasks_for(session, plan.id), documents, requirements, holder)
+    packet_path = generate_packet(
+        plan,
+        _tasks_for(session, plan.id),
+        documents,
+        requirements,
+        holder,
+        travel_rule=travel_rule,
+    )
     _replace_packet_record(session, plan.id, packet_path.name)
 
-    run.summary = (
-        f"Checked {len(requirements)} official requirements, rebuilt "
-        f"{len(draft.tasks)} tasks, and generated the renewal packet."
-    )
+    if event.event_type == "watch":
+        run.summary = (
+            f"Built an expiry watch, checked {len(requirements)} official "
+            f"requirements, rebuilt {len(draft.tasks)} tasks, and generated the packet."
+        )
+    else:
+        run.summary = (
+            f"Read the event as {event.event_type.replace('_', ' ')}, checked "
+            f"{len(requirements)} official requirements, rebuilt "
+            f"{len(draft.tasks)} tasks, and generated the renewal packet."
+        )
     run.changes_json = _json_changes(changes)
     run.finished_at = datetime.now(timezone.utc)
     session.add(run)
     session.commit()
 
+    if analysis is not None:
+        _log(
+            session,
+            user_id,
+            run.id,
+            "event",
+            f"Read the event as {analysis.event_type.replace('_', ' ')} "
+            f"({analysis.confidence:.0%} confidence): {analysis.reason}",
+        )
+    if travel_rule is not None:
+        _log(
+            session,
+            user_id,
+            run.id,
+            "travel_rule",
+            f"Passport validity rule: {travel_rule.status} "
+            f"via {travel_rule.source_url or 'manual verification'}.",
+        )
     for doc_type, requirement in requirements.items():
         source = requirement.official_url or "manual verification"
         _log(
@@ -128,7 +188,7 @@ def _execute(
         user_id,
         run.id,
         "plan",
-        f"Plan rebuilt for {event.title}: {len(draft.tasks)} tasks, ${draft.risk_total_cents / 100:,.0f} at risk.",
+        f"Plan rebuilt for {event.title}: {len(draft.tasks)} tasks.",
     )
     _log(session, user_id, run.id, "packet", f"Packet generated: {packet_path.name}.")
     for change in changes:
@@ -140,11 +200,7 @@ def _refresh_requirements(
     documents: list[Document],
     event: Event,
 ) -> tuple[dict[str, Requirement], list[str]]:
-    doc_types = {doc.doc_type for doc in documents}
-    doc_types.update({"passport", "driver_license", "professional_license", "renters_insurance"})
-    if _needs_visa(event.destination):
-        doc_types.add("india_evisa")
-    doc_types.discard("other")
+    doc_types = required_doc_types(event, documents)
 
     live_search = TavilySearch().available
     if not live_search:
@@ -215,9 +271,19 @@ def _replace_packet_record(session: Session, plan_id: int, filename: str) -> Non
     session.commit()
 
 
-def _needs_visa(destination: str | None) -> bool:
-    text = (destination or "").lower()
-    return any(country in text for country in ("india", "china", "brazil", "vietnam"))
+def _apply_analysis(session: Session, event: Event, analysis) -> None:
+    import json
+
+    event.event_type = analysis.event_type
+    event.home_location = analysis.home_location
+    event.destination_country = analysis.destination_country
+    event.is_international = analysis.is_international
+    event.event_type_confidence = analysis.confidence
+    event.event_type_reason = analysis.reason
+    event.relevant_docs_json = json.dumps(analysis.relevant_document_types)
+    session.add(event)
+    session.commit()
+    session.refresh(event)
 
 
 def _json_changes(changes: list[str]) -> str:

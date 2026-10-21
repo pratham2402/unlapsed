@@ -4,21 +4,39 @@
 <section class="docket">
   <div>
     <div class="docket-kicker">
-      Plan{% if event %} / {{ event.event_type|replace('_', ' ') }}{% endif %}
+      Plan{% if event %} / {% if watch_mode %}expiry watch{% else %}{{ event.event_type|replace('_', ' ') }}{% endif %}{% endif %}
     </div>
     <h1>{{ plan.title }}</h1>
     {% if event %}
     <div class="muted" style="margin-top: 10px;">
-      {{ event.destination }} · {{ event.depart_date|datefmt }} to {{ event.return_date|datefmt }}
+      {% if watch_mode %}
+        No dated event. Expiry watch.
+      {% else %}
+        {% if event.destination %}{{ event.destination }}{% if event.destination_country %} ({{ event.destination_country }}){% endif %} · {% endif %}{{ event.depart_date|datefmt }} to {{ event.return_date|datefmt }}
+      {% endif %}
     </div>
     {% if event.notes %}
     <p class="muted" style="max-width: 76ch; margin-top: 8px;">{{ event.notes }}</p>
     {% endif %}
+    {% if event.event_type_reason %}
+    <p class="muted" style="max-width: 76ch; margin-top: 8px;">
+      Agent reading: {{ event.event_type|replace('_', ' ') }}
+      {% if event.home_location %}· home {{ event.home_location }}{% endif %}
+      {% if event.event_type_confidence %}· {{ "%.0f"|format(event.event_type_confidence * 100) }}% confidence{% endif %}.
+      {{ event.event_type_reason }}
+    </p>
+    {% endif %}
     {% endif %}
   </div>
   <div class="docket-side">
-    <div class="risk-number">{{ plan.risk_total_cents|usd }}</div>
-    <div class="risk-label">at risk if the deadlines are missed</div>
+    <div class="risk-number">{% if watch_mode %}{{ parallel_tasks|length }}{% else %}{{ blocking_tasks|length }}{% endif %}</div>
+    <div class="risk-label">
+      {% if watch_mode %}
+        expiry watch items
+      {% else %}
+        blockers · {{ parallel_tasks|length }} parallel risks
+      {% endif %}
+    </div>
   </div>
 </section>
 
@@ -36,6 +54,7 @@
   <a class="btn btn-secondary" href="/plans/{{ plan.id }}/calendar.ics">Add to calendar</a>
 </div>
 
+{% if not watch_mode %}
 <section class="section">
   <div class="section-head">
     <h2 class="section-title">Critical path</h2>
@@ -53,7 +72,7 @@
         <div class="timeline-meta">
           {% if task.start_date %}<span>Start {{ task.start_date|datefmt("%d %b") }}</span>{% endif %}
           <span>{{ task.priority }}</span>
-          <span>{{ task.cost_of_missing_cents|usd }} if missed</span>
+          <span>{% if task.blocking %}Blocking{% else %}Parallel{% endif %}</span>
           {% if task.depends_on %}<span>Depends on: {{ task.depends_on|join(', ')|replace('_', ' ') }}</span>{% endif %}
           {% if task.evidence_url %}<a href="{{ task.evidence_url }}" target="_blank" rel="noreferrer">Official source</a>{% endif %}
           {% if not settings.demo_read_only %}
@@ -72,11 +91,18 @@
   <div class="empty">No blocking tasks for this event.</div>
   {% endif %}
 </section>
+{% endif %}
 
 <section class="section">
   <div class="section-head">
-    <h2 class="section-title">Parallel risks</h2>
-    <span class="section-note">{{ parallel_tasks|length }} tasks that do not block the trip</span>
+    <h2 class="section-title">{% if watch_mode %}Expiry watch{% else %}Parallel risks{% endif %}</h2>
+    <span class="section-note">
+      {% if watch_mode %}
+        {{ parallel_tasks|length }} documents inside the renewal window
+      {% else %}
+        {{ parallel_tasks|length }} tasks that do not block the event
+      {% endif %}
+    </span>
   </div>
   {% if parallel_tasks %}
   <div class="timeline">
@@ -90,7 +116,7 @@
         <div class="timeline-meta">
           {% if task.start_date %}<span>Start {{ task.start_date|datefmt("%d %b") }}</span>{% endif %}
           <span>{{ task.priority }}</span>
-          <span>{{ task.cost_of_missing_cents|usd }} if missed</span>
+          <span>{% if task.blocking %}Blocking{% else %}Parallel{% endif %}</span>
           {% if task.evidence_url %}<a href="{{ task.evidence_url }}" target="_blank" rel="noreferrer">Official source</a>{% endif %}
           {% if not settings.demo_read_only %}
           <form method="post" action="/tasks/{{ task.id }}/toggle" style="margin-left: auto;">
@@ -105,7 +131,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="empty">No parallel risks found.</div>
+  <div class="empty">{% if watch_mode %}No documents are inside their renewal window.{% else %}No parallel risks found.{% endif %}</div>
   {% endif %}
 </section>
 
@@ -115,6 +141,39 @@
     <span class="section-note">Every requirement is tied to a source.</span>
   </div>
   <div class="evidence">
+    {% if travel_rule %}
+    <div class="evidence-item">
+      <div>
+        <div class="evidence-title">
+          Passport validity rule for {{ travel_rule.destination }}
+          <span class="stamp {{ travel_rule.status|status_class }}">{{ travel_rule.status|status_text }}</span>
+        </div>
+        <div class="evidence-meta">
+          {% if travel_rule.passport_validity_months is none %}
+            No verified period. Verify it manually.
+          {% elif travel_rule.passport_validity_months == 0 %}
+            Valid through the return date. No extra months.
+          {% else %}
+            {{ travel_rule.passport_validity_months }} months beyond the return date.
+          {% endif %}
+          · Checked {{ travel_rule.checked_at|datefmt }} · Confidence {{ "%.0f"|format(travel_rule.confidence * 100) }}%
+        </div>
+        <div class="evidence-meta">{{ travel_rule.rule_text }}</div>
+        <div class="evidence-meta">
+          Visa:
+          {% if travel_rule.visa_required is true %}{{ travel_rule.visa_type or 'Required' }}
+          {% elif travel_rule.visa_required is false %}No visa required according to the source
+          {% else %}Not stated in the source{% endif %}
+          {% if travel_rule.visa_rule_text %} · {{ travel_rule.visa_rule_text }}{% endif %}
+        </div>
+        {% if travel_rule.source_url %}
+        <div class="evidence-meta"><a href="{{ travel_rule.source_url }}" target="_blank" rel="noreferrer">{{ travel_rule.source_url }}</a></div>
+        {% else %}
+        <div class="evidence-meta">No official public source found. Verify manually.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
     {% for doc_type, req in requirements.items() %}
     <div class="evidence-item">
       <div>
@@ -149,7 +208,7 @@
   <div class="packet">
     <div>
       <div class="evidence-title">Renewal packet</div>
-      <div class="evidence-meta">Checklist, form-ready data, evidence citations, and a cover letter. Generated from the current plan.</div>
+      <div class="evidence-meta">Checklist, form-ready data, evidence citations, and per-document cover letters. Generated from the current plan.</div>
     </div>
     <div class="btn-row">
       {% if packet %}

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
-from app.models import Requirement
+from app.models import Requirement, TravelRule
 from app.services.nebius import NebiusClient, NebiusError
 from app.services.tavily import SearchHit, TavilyError, TavilySearch
 
@@ -64,6 +66,26 @@ OFFICIAL_SOURCES: dict[str, OfficialSource] = {
         manual_only=True,
     ),
 }
+
+
+TRAVEL_RULE_DOMAINS = ("travel.state.gov",)
+
+
+@dataclass
+class TravelRuleData:
+    destination: str
+    home_location: str = "United States"
+    passport_validity_months: int | None = None
+    rule_text: str = ""
+    visa_required: bool | None = None
+    visa_type: str = ""
+    visa_rule_text: str = ""
+    source_title: str = ""
+    source_url: str = ""
+    source_excerpt: str = ""
+    confidence: float = 0.0
+    status: str = "needs_manual_check"
+    provider: str = "tavily"
 
 
 @dataclass
@@ -233,6 +255,248 @@ Sources:
         status=status,
         provider="tavily",
     )
+
+
+def verify_travel_rule(
+    destination: str,
+    home_location: str = "United States",
+) -> TravelRuleData:
+    """Read the destination's passport validity rule from an official source."""
+    destination = (destination or "").strip()
+    home_location = (home_location or "United States").strip()
+    if not destination:
+        return TravelRuleData(
+            destination=destination,
+            home_location=home_location,
+            rule_text="No destination was supplied.",
+            status="needs_manual_check",
+        )
+
+    home_text = home_location.lower().strip()
+    is_us_home = home_text in {"us", "u.s.", "usa"} or any(
+        alias in home_text
+        for alias in ("united states", "u.s.", "usa", "america")
+    )
+    if not is_us_home:
+        return TravelRuleData(
+            destination=destination,
+            home_location=home_location,
+            rule_text=(
+                "The travel-rule source registry is currently US-focused. "
+                "Verify the passport validity rule with your own government."
+            ),
+            status="needs_manual_check",
+        )
+
+    searcher = TavilySearch()
+    if not searcher.available:
+        return TravelRuleData(
+            destination=destination,
+            home_location=home_location,
+            rule_text=(
+                "TAVILY_API_KEY is not set. Verify the destination's passport "
+                "validity rule manually."
+            ),
+            status="needs_manual_check",
+        )
+
+    query = (
+        f"{destination} Travel Advisory passport validity entry requirements "
+        "official travel.state.gov"
+    )
+    secondary = (
+        f"{destination} country information passport must be valid "
+        "official travel.state.gov"
+    )
+    try:
+        hits = searcher.search(
+            query, include_domains=TRAVEL_RULE_DOMAINS, max_results=8
+        )
+        hits = _filter_travel_pages(
+            _filter_allowed(hits, TRAVEL_RULE_DOMAINS), destination
+        )
+        if not hits:
+            extra = searcher.search(
+                secondary, include_domains=TRAVEL_RULE_DOMAINS, max_results=8
+            )
+            hits = _filter_travel_pages(
+                _filter_allowed(extra, TRAVEL_RULE_DOMAINS), destination
+            )
+    except TavilyError as exc:
+        return TravelRuleData(
+            destination=destination,
+            home_location=home_location,
+            rule_text=f"Official-source search failed: {exc}",
+            status="needs_manual_check",
+        )
+
+    if not hits:
+        return TravelRuleData(
+            destination=destination,
+            home_location=home_location,
+            rule_text=(
+                "No official destination page was found. Verify the passport "
+                "validity rule manually."
+            ),
+            status="needs_manual_check",
+        )
+
+    client = NebiusClient()
+    if not client.available:
+        return _travel_rule_source_only(destination, home_location, hits[0])
+
+    prompt = f"""
+Extract the passport validity rule for a traveler from {home_location} visiting {destination}.
+Return one JSON object:
+
+{{
+  "passport_validity_months": 6,
+  "rule_text": "the exact rule in one sentence, or 'Not stated in source'",
+  "visa_required": true,
+  "visa_type": "short label such as Schengen visa, e-Visa, visa on arrival, or none",
+  "visa_rule_text": "the exact visa rule in one sentence, or 'Not stated in source'",
+  "official_url": "one of the supplied URLs",
+  "confidence": 0.0,
+  "notes": "anything important about entry or transit"
+}}
+
+Rules:
+- Use only the supplied official sources.
+- Prefer the destination-specific Travel Advisory or Country Information page.
+- Ignore visa reciprocity tables.
+- Return an integer number of months only when the source states it.
+- Six months beyond arrival, departure, or return all mean 6.
+- If the source says the passport must simply be valid at entry, return 0.
+- If the source does not state a validity period, return null.
+- For visa_required, return true only when the source says a visa is required, false when it says no visa is required, and null when the source does not state it.
+- Confidence is for the passport validity rule. Do not set it to zero only because the visa type is missing.
+- Never invent a passport or visa rule.
+
+Sources:
+{_build_context(hits[:5])}
+"""
+    try:
+        payload = client.chat_json(
+            prompt,
+            system=(
+                "You extract official passport validity rules. Use only the supplied "
+                "sources. Return strict JSON only. Never invent a rule."
+            ),
+            model=client.reasoning_model,
+            max_tokens=1200,
+        )
+    except NebiusError:
+        try:
+            payload = client.chat_json(
+                prompt,
+                system=(
+                    "You extract official passport validity rules. Use only the supplied "
+                    "sources. Return strict JSON only. Never invent a rule."
+                ),
+                model=client.fast_model,
+                max_tokens=1600,
+            )
+        except NebiusError:
+            return _travel_rule_source_only(destination, home_location, hits[0])
+
+    months = _optional_int(payload.get("passport_validity_months"))
+    official_url = str(payload.get("official_url") or "")
+    chosen = _match_hit(official_url, hits) or hits[0]
+    rule_text = str(payload.get("rule_text") or "").strip()
+    visa_required = _optional_bool(payload.get("visa_required"))
+    visa_type = str(payload.get("visa_type") or "").strip()
+    visa_rule_text = str(payload.get("visa_rule_text") or "").strip()
+    if visa_type.lower().startswith("not stated"):
+        visa_type = ""
+    if visa_rule_text.lower().startswith("not stated"):
+        visa_rule_text = ""
+    confidence = _clamp(payload.get("confidence", 0.6))
+
+    candidates = _month_candidates(f"{rule_text} {chosen.content}")
+    mismatch = months is not None and bool(candidates) and months not in candidates
+
+    status = "verified"
+    if months is None or not rule_text or rule_text.lower().startswith("not stated"):
+        status = "needs_manual_check"
+    if mismatch:
+        status = "needs_manual_check"
+        confidence = min(confidence, 0.4)
+    elif status == "verified" and confidence < 0.6:
+        confidence = 0.6
+    if confidence < 0.45:
+        status = "needs_manual_check"
+
+    return TravelRuleData(
+        destination=destination,
+        home_location=home_location,
+        passport_validity_months=months,
+        rule_text=rule_text or "Not stated in source",
+        visa_required=visa_required,
+        visa_type=visa_type,
+        visa_rule_text=visa_rule_text,
+        source_title=chosen.title,
+        source_url=chosen.url,
+        source_excerpt=chosen.content[:500],
+        confidence=confidence,
+        status=status,
+        provider="tavily",
+    )
+
+
+def _travel_rule_source_only(
+    destination: str,
+    home_location: str,
+    hit: SearchHit,
+) -> TravelRuleData:
+    return TravelRuleData(
+        destination=destination,
+        home_location=home_location,
+        rule_text="Official page found, but the validity period was not extracted.",
+        source_title=hit.title,
+        source_url=hit.url,
+        source_excerpt=hit.content[:500],
+        confidence=0.3,
+        status="needs_manual_check",
+    )
+
+
+def upsert_travel_rule(session: Session, data: TravelRuleData) -> TravelRule:
+    latest = get_latest_travel_rule(session, data.destination)
+    if latest and _same_travel_rule(latest, data):
+        latest.checked_at = datetime.now(timezone.utc)
+        session.add(latest)
+        session.commit()
+        session.refresh(latest)
+        return latest
+
+    rule = TravelRule(
+        destination=data.destination,
+        home_location=data.home_location,
+        passport_validity_months=data.passport_validity_months,
+        rule_text=data.rule_text,
+        visa_required=data.visa_required,
+        visa_type=data.visa_type,
+        visa_rule_text=data.visa_rule_text,
+        source_title=data.source_title,
+        source_url=data.source_url,
+        source_excerpt=data.source_excerpt,
+        confidence=data.confidence,
+        status=data.status,
+        provider=data.provider,
+    )
+    session.add(rule)
+    session.commit()
+    session.refresh(rule)
+    return rule
+
+
+def get_latest_travel_rule(session: Session, destination: str) -> TravelRule | None:
+    statement = (
+        select(TravelRule)
+        .where(func.lower(TravelRule.destination) == (destination or "").strip().lower())
+        .order_by(TravelRule.checked_at.desc(), TravelRule.id.desc())
+    )
+    return session.exec(statement).first()
 
 
 def upsert_requirement(session: Session, data: RequirementData) -> Requirement:
@@ -455,6 +719,31 @@ def _host_allowed(url: str, domains: tuple[str, ...]) -> bool:
     return False
 
 
+def _filter_travel_pages(
+    hits: list[SearchHit],
+    destination: str = "",
+) -> list[SearchHit]:
+    """Prefer destination travel pages over visa reciprocity tables."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (destination or "").lower()).strip("-")
+    without_visa_tables = [
+        hit for hit in hits if "visa-reciprocity" not in hit.url.lower()
+    ]
+    destination_hits = [
+        hit for hit in without_visa_tables if slug and slug in hit.url.lower()
+    ]
+    if destination_hits:
+        return destination_hits
+
+    preferred = [
+        hit
+        for hit in without_visa_tables
+        if "travel-advisories" in hit.url or "international-travel" in hit.url
+    ]
+    if preferred:
+        return preferred
+    return without_visa_tables or hits
+
+
 def _match_hit(url: str, hits: list[SearchHit]) -> SearchHit | None:
     if not url:
         return None
@@ -485,6 +774,71 @@ def _same_requirement(existing: Requirement, data: RequirementData) -> bool:
         and existing.status == data.status
         and existing.required_documents == data.required_documents
     )
+
+
+def _same_travel_rule(existing: TravelRule, data: TravelRuleData) -> bool:
+    return (
+        existing.home_location == data.home_location
+        and existing.passport_validity_months == data.passport_validity_months
+        and existing.visa_required == data.visa_required
+        and existing.visa_type == data.visa_type
+        and existing.visa_rule_text == data.visa_rule_text
+        and existing.source_url == data.source_url
+        and existing.status == data.status
+        and existing.rule_text == data.rule_text
+    )
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in {"true", "yes", "required", "1"}:
+            return True
+        if text in {"false", "no", "not required", "0"}:
+            return False
+    if isinstance(value, int):
+        return bool(value)
+    return None
+
+
+def _month_candidates(text: str) -> set[int]:
+    words = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+        "eleven": 11,
+        "twelve": 12,
+    }
+    pattern = re.compile(
+        r"(?P<number>\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+        r"(?:\s*\(\s*\d+\s*\))?\s*months?",
+        re.IGNORECASE,
+    )
+    found: set[int] = set()
+    for match in pattern.finditer(text or ""):
+        raw = match.group("number").lower()
+        value = int(raw) if raw.isdigit() else words.get(raw)
+        if value is not None:
+            found.add(value)
+    return found
 
 
 def _string_list(value: object) -> list[str]:

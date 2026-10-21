@@ -24,7 +24,6 @@ def main() -> None:
         print("Demo seeded.")
         print(f"User: {settings.demo_user_email}")
         print(f"Plan: {plan.title if plan else 'none'}")
-        print(f"Risk: ${plan.risk_total_usd:,.0f}" if plan else "No plan")
         print("Open the app and visit /")
 
 

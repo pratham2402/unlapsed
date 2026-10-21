@@ -31,17 +31,17 @@ Voiceover is the safest option. The rules ask for a public video that explains t
 
 ### 0:12 to 0:30 — What Unlapsed does
 
-**On screen:** Scroll from the headline to the next actions and the risk number.
+**On screen:** Scroll from the expiry watch to the event plan and its blocking tasks.
 
 **Voiceover:**
 "Unlapsed is a private renewal agent. It reads your documents, checks the current official rule, builds a plan backward from a date that matters, and prepares the packet. This is a synthetic sample case, not real personal data."
 
 ### 0:30 to 0:55 — The dashboard
 
-**On screen:** Point at the headline, the $7,700 risk, and the next actions. Open the plan.
+**On screen:** Point at the expiry watch, the nearest expiry, then the event plan and its blocking tasks. Open the plan.
 
 **Voiceover:**
-"The trip is in January. The passport expires in June. That looks fine until you apply the six-month validity rule. The agent finds the conflict, then orders the work: renew the passport, apply for the e-Visa, and do the final check before the trip."
+"The documents are the product. The expiry watch comes first. The trip is one dated event. The agent reads the event as international, checks the destination's passport and visa rules on the official source, and finds the conflict. Then it orders the work: renew the passport, apply for the e-Visa, and do the final check."
 
 ### 0:55 to 1:20 — Document provenance
 
@@ -55,7 +55,7 @@ Voiceover is the safest option. The rules ask for a public video that explains t
 **On screen:** Return to the Plan. Scroll through the critical path and the evidence panel.
 
 **Voiceover:**
-"The plan is a dependency graph, not a list. The e-Visa waits for the new passport. The final check waits for both. Underneath, every requirement has an official source and a checked date. The passport fees and processing times came from the State Department. The e-Visa page did not state a fee, so the app says verify manually. It does not guess."
+"The plan is a dependency graph, not a list. The e-Visa waits for the new passport. The final check waits for both. Underneath, every requirement has an official source and a checked date. The passport validity rule, fees, and processing times came from the State Department. The e-Visa page did not state a fee, so the app says verify manually. It does not guess."
 
 ### 1:50 to 2:10 — The packet
 

@@ -22,17 +22,19 @@ I wanted a tool that plans the chain, checks the current official rule, and prep
 
 ## What it does
 
-Unlapsed reads text-based PDFs of documents such as a passport, driver's license, insurance policy, and professional license. It extracts the holder, issuer, dates, and constraints, and keeps the exact source line for every fact.
+Unlapsed puts the document expiry watch first. It reads text-based PDFs of documents such as a passport, driver's license, insurance policy, and professional license. It extracts the holder, issuer, dates, and constraints, and keeps the exact source line for every fact.
 
-It then searches the official issuer site with Tavily for the current fee, processing time, required documents, and steps. The result is stored with its URL, checked date, and confidence. If the official source does not state a value, the app marks it "verify manually" instead of guessing.
+When the user adds a dated event, the agent reads the event text, the destination, the destination country, the home location, and the document inventory. It infers whether the event is domestic or international, which documents can affect it, and how much confidence it has. The user can override the reading. The plan page shows the reading and the reason.
 
-It builds a dependency-aware plan backward from a life event. The seeded case is a synthetic US professional planning a trip to India. The passport expires on 14 June 2027, and the trip returns on 24 January 2027. The destination requires six months of passport validity beyond the return date, so the passport must be valid through 24 July 2027. The agent builds the passport renewal, then the India e-Visa, then the final travel check. It also flags the renters insurance lapse and the 30 continuing education hours for the professional license as parallel risks.
+It then searches the official issuer site with Tavily for the current fee, processing time, required documents, and steps. It also checks the destination's passport validity rule and visa requirement on an official source. The result is stored with its URL, checked date, and confidence. If the official source does not state a value, the app marks it "verify manually" instead of guessing. For a non-India destination, a stated or unknown visa requirement becomes a generic visa verification task, not a fabricated application.
 
-It prices the cost of missing each deadline, generates a PDF packet with the checklist and form-ready data, and creates an `.ics` calendar file.
+It builds a dependency-aware plan backward from the event. The seeded case is a synthetic US professional planning a trip to India. The passport expires on 14 June 2027, and the trip returns on 24 January 2027. The destination requires six months of passport validity beyond the return date, so the passport must be valid through 24 July 2027. The agent builds the passport renewal, then the India e-Visa, then the final travel check. It also flags the renters insurance lapse and the 30 continuing education hours for the professional license as parallel risks.
 
-The dollar risk figures are sample planning assumptions, not quotes. The official renewal fees are shown separately in the evidence panel.
+The same planner handles domestic travel, where the driver's license becomes the blocking document if it expires before the event. It also handles a move, a job start, and a generic dated event. With no event at all, it runs an expiry watch instead of inventing a trip.
 
-The public demo is read-only and runs from a pre-seeded database, so it does not spend sponsor credits. The video shows the live extraction and verification, and the repository has the full interactive path.
+It marks what blocks the event and what is a parallel risk, then generates a PDF packet with the checklist and form-ready data and an `.ics` calendar file. It does not estimate trip losses or other personal costs. Official renewal fees are shown in the evidence panel, with their source.
+
+The public demo is read-only. The database is generated state and is seeded on first boot from the sample PDFs, so the public URL does not spend sponsor credits. The video shows the live extraction and verification, and the repository has the full interactive path.
 
 ## Why it is different
 
@@ -44,24 +46,30 @@ The public demo is read-only and runs from a pre-seeded database, so it does not
 ## How we built it
 
 - FastAPI and Jinja for the product.
-- SQLModel and SQLite for persistent memory, facts, requirements, plans, tasks, and the activity log.
+- SQLModel and SQLite for persistent memory, facts, requirements, travel rules, plans, tasks, and the activity log.
 - Nebius Token Factory for inference.
-- NVIDIA Nemotron Nano for document extraction and Nemotron Super for official-policy extraction.
+- NVIDIA Nemotron Nano for document extraction and event analysis, and Nemotron Super for official-policy and travel-rule extraction.
 - Tavily for official-source search with a domain allowlist and citation capture.
 - pypdf for text PDF extraction.
 - ReportLab for the packet PDF.
-- A deterministic planner for the dependency graph, date math, and risk pricing. The model extracts and explains; it does not decide the legal deadline.
+- A deterministic planner for the dependency graph, date math, and blocker labels. The model classifies and extracts; it does not decide the legal deadline.
+- No LangChain or LangGraph. The orchestration is a small Python service layer. The tools are direct function calls, not MCP servers.
 
 ## Model use and cost
 
-The fast model handles document extraction. The reasoning model handles official-policy extraction. If the reasoning call fails, the app retries once with the fast model, then falls back to a source-only result.
+The fast model handles document extraction and event analysis. The reasoning model handles official-policy extraction and the destination travel rule. If the reasoning call fails, the app retries once with the fast model, then falls back to a source-only result.
 
-Page loads make no model calls. The plan, evidence, and activity log are read from SQLite. A run makes one extraction call per new document and one policy call per document type. Tavily results and requirements are cached in the database. The planner and the date math spend no tokens.
+Page loads make no model calls. The plan, evidence, and activity log are read from SQLite. A run makes one event-analysis call, one extraction call per new document, one travel-rule call for an international event, and one policy call per relevant document type. Tavily results, requirements, and travel rules are cached in the database. The planner and the date math spend no tokens.
+
+Hardcoded on purpose: official-source allowlists, date arithmetic, dependency order, blocker labels, safety controls, and data contracts. The model proposes and extracts. The code applies the rule.
 
 ## Challenges
 
 - Keeping the model from inventing fees or processing times. Weak evidence becomes "verify manually."
 - Making the plan trustworthy. The dates and dependencies are code, not model output.
+- Letting the model read the event without letting it silently skip a document. The reading is shown, the user can override it, and any document that expires before the event is added back.
+- Replacing the fixed six-month passport rule with an evidence-backed rule from the destination's official source. When the source is missing, the app asks the user to verify the rule instead of assuming a period.
+- Resolving a city destination to a country so the passport and visa checks use the right official page. The country field is optional, but it removes ambiguity when the model cannot tell.
 - Keeping the demo simple. The app rejects scanned PDFs with a clear message instead of pretending OCR works.
 
 ## Accomplishments
@@ -81,7 +89,8 @@ Page loads make no model calls. The plan, evidence, and activity log are read fr
 ## What's next
 
 - OCR for scanned documents.
-- More jurisdictions and document types.
+- More country-specific visa workflows, beyond the generic verification task.
+- A trusted destination-country resolver for city and region names.
 - A source registry with change monitoring.
 - Authentication and encrypted storage for a production deployment.
 

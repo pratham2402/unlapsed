@@ -14,7 +14,7 @@
     <aside class="rail">
       <a class="wordmark" href="/">
         <span class="wordmark-main">Unlapsed</span>
-        <span class="wordmark-sub">Document renewal office</span>
+        <span class="wordmark-sub">Private renewal agent</span>
       </a>
 
       <nav class="rail-nav" aria-label="Main">
@@ -33,7 +33,7 @@
         <div class="rail-label">Case status</div>
         <div class="rail-stat"><span>{{ documents|length }}</span> documents</div>
         <div class="rail-stat"><span>{{ requirements|length }}</span> sources checked</div>
-        <div class="rail-stat"><span>{% if plan %}{{ plan.risk_total_cents|usd }}{% else %}$0{% endif %}</span> at risk</div>
+        <div class="rail-stat"><span>{% if plan %}active{% else %}watch{% endif %}</span> event plan</div>
       </div>
 
       <div class="rail-mode">

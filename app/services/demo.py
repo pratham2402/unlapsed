@@ -17,12 +17,17 @@ from app.models import (
     Plan,
     PlanTask,
     Requirement,
+    TravelRule,
 )
 from app.services.agent import run_agent
 from app.services.extraction import extract_document_from_bytes
 from app.services.packet import generate_packet
-from app.services.planner import get_active_plan
-from app.services.verification import get_latest_requirement, seed_fallback_requirements
+from app.services.planner import get_active_plan, get_latest_event, required_doc_types
+from app.services.verification import (
+    get_latest_requirement,
+    get_latest_travel_rule,
+    seed_fallback_requirements,
+)
 
 
 def seed_demo(session: Session, reset: bool = True) -> Plan | None:
@@ -82,6 +87,9 @@ def seed_demo(session: Session, reset: bool = True) -> Plan | None:
         event_type="trip",
         title="Trip to India",
         destination="India",
+        destination_country="India",
+        home_location="United States",
+        is_international=True,
         depart_date=date(2027, 1, 10),
         return_date=date(2027, 1, 24),
         notes="Two-week trip. Non-refundable flights and hotels.",
@@ -119,20 +127,27 @@ def ensure_packet(session: Session) -> None:
     documents = session.exec(
         select(Document).where(Document.user_id == settings.demo_user_email)
     ).all()
+    event = get_latest_event(session, settings.demo_user_email)
+    doc_types = required_doc_types(event, documents) if event else {doc.doc_type for doc in documents}
     requirements = {}
-    for doc_type in (
-        "passport",
-        "india_evisa",
-        "driver_license",
-        "professional_license",
-        "renters_insurance",
-    ):
+    for doc_type in sorted(doc_types):
         requirement = get_latest_requirement(session, doc_type)
         if requirement is not None:
             requirements[doc_type] = requirement
 
     holder = next((doc.holder_name for doc in documents if doc.holder_name), "Alex Morgan")
-    path = generate_packet(plan, tasks, documents, requirements, holder)
+    travel_rule = (
+        get_latest_travel_rule(
+            session, event.destination_country or event.destination
+        )
+        if event is not None
+        and event.event_type == "trip"
+        and (event.destination_country or event.destination)
+        else None
+    )
+    path = generate_packet(
+        plan, tasks, documents, requirements, holder, travel_rule=travel_rule
+    )
 
     existing = session.exec(select(Packet).where(Packet.plan_id == plan.id)).all()
     for packet in existing:
@@ -148,6 +163,7 @@ def _clear(session: Session) -> None:
         Plan,
         Activity,
         AgentRun,
+        TravelRule,
         Requirement,
         Fact,
         Document,

@@ -25,15 +25,22 @@ from app.models import (
 )
 from app.services.agent import run_agent
 from app.services.demo import seed_demo
+from app.services.event_analysis import guess_home_location
 from app.services.extraction import (
     ExtractionError,
     LowTextError,
     extract_document_from_bytes,
 )
 from app.services.packet import generate_calendar
-from app.services.planner import get_active_plan, get_latest_event
+from app.services.planner import (
+    EVENT_TYPE_LABELS,
+    EVENT_TYPES,
+    get_active_plan,
+    get_latest_event,
+    required_doc_types,
+)
 from app.services.tracing import configure_tracing
-from app.services.verification import get_latest_requirement
+from app.services.verification import get_latest_requirement, get_latest_travel_rule
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -125,8 +132,13 @@ def _context(request: Request, session: Session, **extra) -> dict:
         .where(AgentRun.user_id == user_id)
         .order_by(AgentRun.started_at.desc(), AgentRun.id.desc())
     ).first()
+    event = extra.get("event") or get_latest_event(session, user_id)
+    if event is not None:
+        doc_types = required_doc_types(event, documents)
+    else:
+        doc_types = {doc.doc_type for doc in documents if doc.doc_type != "other"}
     requirements = {}
-    for doc_type in ("passport", "india_evisa", "driver_license", "professional_license", "renters_insurance"):
+    for doc_type in sorted(doc_types):
         requirement = get_latest_requirement(session, doc_type)
         if requirement is not None:
             requirements[doc_type] = requirement
@@ -154,6 +166,24 @@ def _context(request: Request, session: Session, **extra) -> dict:
 @app.get("/")
 def dashboard(request: Request, session: Session = Depends(get_session)):
     user_id = get_settings().demo_user_email
+    documents = sorted(
+        session.exec(select(Document).where(Document.user_id == user_id)).all(),
+        key=lambda document: (
+            document.expiry_date is None,
+            document.expiry_date or date.max,
+            document.id or 0,
+        ),
+    )
+    event = get_latest_event(session, user_id)
+    travel_rule = (
+        get_latest_travel_rule(
+            session, event.destination_country or event.destination
+        )
+        if event is not None
+        and event.event_type == "trip"
+        and (event.destination_country or event.destination)
+        else None
+    )
     tasks = []
     if plan := get_active_plan(session, user_id):
         tasks = session.exec(
@@ -170,17 +200,47 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
         for task in tasks
         if task.document_id is not None and task.blocking
     }
+    blocking_count = sum(
+        1 for task in tasks if task.blocking and task.status != "done"
+    )
+    parallel_count = sum(
+        1 for task in tasks if not task.blocking and task.status != "done"
+    )
 
-    headline = "Add a trip to see what needs renewing first."
+    expiring_documents = sorted(
+        [
+            document
+            for document in documents
+            if document.days_until_expiry is not None
+            and document.days_until_expiry <= document.renewal_window_days
+        ],
+        key=lambda document: document.expiry_date or date.max,
+    )
+    if not documents:
+        headline = "Upload a document to start the expiry watch."
+    elif expiring_documents:
+        count = len(expiring_documents)
+        verb = "needs" if count == 1 else "need"
+        headline = f"{count} document{'s' if count != 1 else ''} {verb} attention."
+    elif conflict_doc_ids:
+        count = len(conflict_doc_ids)
+        verb = "conflicts" if count == 1 else "conflict"
+        headline = (
+            f"{count} document{'s' if count != 1 else ''} {verb} with the current event."
+        )
+    else:
+        headline = "All documents are current."
+
+    plan_headline = ""
     if plan:
         critical = next(
             (task for task in next_tasks if task.priority == "critical" and task.due_date),
             None,
         )
         if critical:
-            headline = f"{critical.title} by {critical.due_date.strftime('%d %B')}."
+            plan_headline = f"{critical.title} by {critical.due_date.strftime('%d %B')}."
         else:
-            headline = plan.summary.split(".")[0] + "."
+            plan_headline = plan.summary.split(".")[0] + "."
 
     return templates.TemplateResponse(
         request=request,
@@ -191,7 +251,14 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
             tasks=tasks,
             next_tasks=next_tasks,
             headline=headline,
+            plan_headline=plan_headline,
             conflict_doc_ids=conflict_doc_ids,
+            expiring_documents=expiring_documents,
+            event=event,
+            documents=documents,
+            travel_rule=travel_rule,
+            blocking_count=blocking_count,
+            parallel_count=parallel_count,
         ),
     )
 
@@ -291,10 +358,16 @@ async def upload_document(
 
 @app.get("/events/new")
 def new_event(request: Request, session: Session = Depends(get_session)):
+    user_id = get_settings().demo_user_email
+    documents = session.exec(select(Document).where(Document.user_id == user_id)).all()
     return templates.TemplateResponse(
         request=request,
         name="event_new.html",
-        context=_context(request, session),
+        context=_context(
+            request,
+            session,
+            suggested_home=guess_home_location(documents),
+        ),
     )
 
 
@@ -302,7 +375,10 @@ def new_event(request: Request, session: Session = Depends(get_session)):
 def create_event(
     request: Request,
     title: str = Form(...),
+    event_type: str = Form("auto"),
     destination: str = Form(""),
+    destination_country: str = Form(""),
+    home_location: str = Form(""),
     depart_date: str = Form(""),
     return_date: str = Form(""),
     notes: str = Form(""),
@@ -314,23 +390,51 @@ def create_event(
             status_code=303,
         )
     user_id = get_settings().demo_user_email
+    event_type = event_type if event_type in EVENT_TYPES else "auto"
+    if len(title.strip()) > 120 or len(destination.strip()) > 120:
+        return RedirectResponse(
+            "/events/new?error=Event+name+and+destination+must+be+120+characters+or+fewer",
+            status_code=303,
+        )
+    if len(destination_country.strip()) > 120 or len(home_location.strip()) > 120:
+        return RedirectResponse(
+            "/events/new?error=Country+and+home+location+must+be+120+characters+or+fewer",
+            status_code=303,
+        )
+    if len(notes.strip()) > 2000:
+        return RedirectResponse(
+            "/events/new?error=Notes+must+be+2000+characters+or+fewer",
+            status_code=303,
+        )
     try:
         depart = date.fromisoformat(depart_date) if depart_date else None
         ret = date.fromisoformat(return_date) if return_date else None
     except ValueError:
         return RedirectResponse("/events/new?error=Use+a+valid+date", status_code=303)
 
-    if depart and ret and ret < depart:
+    if depart is None or ret is None:
         return RedirectResponse(
-            "/events/new?error=Return+date+must+be+after+departure",
+            "/events/new?error=Start+and+end+dates+are+required",
+            status_code=303,
+        )
+    if ret < depart:
+        return RedirectResponse(
+            "/events/new?error=End+date+must+be+on+or+after+the+start+date",
+            status_code=303,
+        )
+    if ret < date.today():
+        return RedirectResponse(
+            "/events/new?error=Event+dates+cannot+be+in+the+past",
             status_code=303,
         )
 
     event = Event(
         user_id=user_id,
-        event_type="trip",
-        title=title.strip() or "Trip",
+        event_type=event_type,
+        title=title.strip() or EVENT_TYPE_LABELS.get(event_type, "Event"),
         destination=destination.strip(),
+        destination_country=destination_country.strip(),
+        home_location=home_location.strip(),
         depart_date=depart,
         return_date=ret,
         notes=notes.strip(),
@@ -361,6 +465,15 @@ def plan_detail(plan_id: int, request: Request, session: Session = Depends(get_s
     ).first()
     blocking = [task for task in tasks if task.blocking]
     parallel = [task for task in tasks if not task.blocking]
+    travel_rule = (
+        get_latest_travel_rule(
+            session, event.destination_country or event.destination
+        )
+        if event is not None
+        and event.event_type == "trip"
+        and (event.destination_country or event.destination)
+        else None
+    )
     return templates.TemplateResponse(
         request=request,
         name="plan.html",
@@ -373,6 +486,8 @@ def plan_detail(plan_id: int, request: Request, session: Session = Depends(get_s
             parallel_tasks=parallel,
             event=event,
             packet=packet,
+            watch_mode=bool(event and event.event_type == "watch"),
+            travel_rule=travel_rule,
         ),
     )
 
@@ -500,6 +615,16 @@ def export_data(session: Session = Depends(get_session)):
     ).all() if documents else []
     plan = get_active_plan(session, user_id)
     tasks = session.exec(select(PlanTask).where(PlanTask.plan_id == plan.id)).all() if plan else []
+    event = session.get(Event, plan.event_id) if plan and plan.event_id else None
+    travel_rule = (
+        get_latest_travel_rule(
+            session, event.destination_country or event.destination
+        )
+        if event is not None
+        and event.event_type == "trip"
+        and (event.destination_country or event.destination)
+        else None
+    )
     payload = {
         "user": user_id,
         "documents": [
@@ -528,15 +653,24 @@ def export_data(session: Session = Depends(get_session)):
         "plan": {
             "title": plan.title,
             "summary": plan.summary,
-            "risk_usd": plan.risk_total_usd,
         } if plan else None,
+        "travel_rule": {
+            "destination": travel_rule.destination,
+            "passport_validity_months": travel_rule.passport_validity_months,
+            "rule_text": travel_rule.rule_text,
+            "visa_required": travel_rule.visa_required,
+            "visa_type": travel_rule.visa_type,
+            "visa_rule_text": travel_rule.visa_rule_text,
+            "source_url": travel_rule.source_url,
+            "checked_at": travel_rule.checked_at.isoformat(),
+            "status": travel_rule.status,
+        } if travel_rule else None,
         "tasks": [
             {
                 "title": task.title,
                 "start_date": task.start_date.isoformat() if task.start_date else None,
                 "due_date": task.due_date.isoformat() if task.due_date else None,
                 "blocking": task.blocking,
-                "cost_usd": task.cost_of_missing_usd,
             }
             for task in tasks
         ],

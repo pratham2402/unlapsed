@@ -3,43 +3,28 @@
 {% block content %}
 <section class="docket">
   <div>
-    <div class="docket-kicker">Sample case / {{ holder_name }}</div>
+    <div class="docket-kicker">Document watch / {{ holder_name }}</div>
     <div class="docket-statement">{{ headline }}</div>
   </div>
   <div class="docket-side">
-    <div class="risk-number">{% if plan %}{{ plan.risk_total_cents|usd }}{% else %}$0{% endif %}</div>
-    <div class="risk-label">at risk if the deadlines are missed</div>
-  </div>
-</section>
-
-<section class="section">
-  <div class="section-head">
-    <h2 class="section-title">Next actions</h2>
-    {% if plan %}<a class="section-note" href="/plans/{{ plan.id }}">Open the full plan</a>{% endif %}
-  </div>
-  <div class="actions">
-    {% for task in next_tasks %}
-    <a class="action {% if task.priority == 'critical' %}critical{% endif %}" href="/plans/{{ plan.id }}">
-      <span class="action-date">{{ task.due_date|datefmt("%d %b") }}</span>
-      <span class="action-title">{{ task.title }}</span>
-      <span class="action-meta">{{ task.cost_of_missing_cents|usd }} if missed</span>
-    </a>
-    {% endfor %}
-    {% if not next_tasks %}
-    <div class="empty">
-      {% if settings.demo_read_only %}
-        No open actions in this pre-verified sample.
-      {% else %}
-        No open actions. Add a trip or upload a document to begin.
-      {% endif %}
+    {% if expiring_documents %}
+    <div class="risk-number">
+      {% if expiring_documents[0].days_until_expiry < 0 %}expired{% else %}{{ expiring_documents[0].days_until_expiry }}d{% endif %}
     </div>
+    <div class="risk-label">until the nearest expiry</div>
+    {% elif conflict_doc_ids %}
+    <div class="risk-number">{{ conflict_doc_ids|length }}</div>
+    <div class="risk-label">event conflict{% if conflict_doc_ids|length != 1 %}s{% endif %}</div>
+    {% else %}
+    <div class="risk-number">{{ documents|length }}</div>
+    <div class="risk-label">documents in the watch</div>
     {% endif %}
   </div>
 </section>
 
 <section class="section">
   <div class="section-head">
-    <h2 class="section-title">Document register</h2>
+    <h2 class="section-title">Expiry watch</h2>
     <a class="section-note" href="/documents">All documents</a>
   </div>
   {% if documents %}
@@ -49,6 +34,7 @@
         <th>Document</th>
         <th>Holder</th>
         <th>Expires</th>
+        <th>Days left</th>
         <th>Status</th>
       </tr>
     </thead>
@@ -61,10 +47,15 @@
         </td>
         <td>{{ doc.holder_name }}</td>
         <td class="mono">{{ doc.expiry_date|datefmt }}</td>
+        <td class="mono">
+          {% if doc.days_until_expiry is none %}not read
+          {% elif doc.days_until_expiry < 0 %}expired
+          {% else %}{{ doc.days_until_expiry }}d{% endif %}
+        </td>
         <td>
           <span class="stamp {{ doc.status_label|status_class }}">{{ doc.status_label }}</span>
           {% if doc.id in conflict_doc_ids %}
-          <span class="stamp status-alert">trip conflict</span>
+          <span class="stamp status-alert">event conflict</span>
           {% endif %}
         </td>
       </tr>
@@ -74,6 +65,101 @@
   {% else %}
   <div class="empty">No documents yet. <a href="/documents">Upload a text PDF</a>.</div>
   {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Event plan</h2>
+    {% if plan %}
+    <span class="section-note">{{ blocking_count }} blockers · {{ parallel_count }} parallel risks · <a href="/plans/{{ plan.id }}">Open the full plan</a></span>
+    {% endif %}
+  </div>
+  {% if plan %}
+  {% if event %}
+  <p class="muted" style="max-width: 76ch; margin: 0 0 6px;">
+    {{ event.title }}{% if event.destination_country %} · {{ event.destination_country }}{% endif %}{% if event.home_location %} · home {{ event.home_location }}{% endif %}
+  </p>
+  {% endif %}
+  <p class="muted" style="max-width: 76ch; margin: 0 0 14px;">{{ plan_headline }}</p>
+  <div class="actions">
+    {% for task in next_tasks %}
+    <a class="action {% if task.priority == 'critical' %}critical{% endif %}" href="/plans/{{ plan.id }}">
+      <span class="action-date">{{ task.due_date|datefmt("%d %b") }}</span>
+      <span class="action-title">{{ task.title }}</span>
+      <span class="action-meta">{% if task.blocking %}Blocking{% else %}Parallel{% endif %}</span>
+    </a>
+    {% endfor %}
+    {% if not next_tasks %}
+    <div class="empty">No open actions in the current event plan.</div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="empty">
+    No event plan yet. The expiry watch still runs from the document register.
+    {% if not settings.demo_read_only %}<a href="/events/new">Add an event</a> to build a plan around a date.{% endif %}
+  </div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Official evidence</h2>
+    <span class="section-note">{{ requirements|length }} checks</span>
+  </div>
+  <div class="evidence">
+    {% if travel_rule %}
+    <div class="evidence-item">
+      <div>
+        <div class="evidence-title">
+          Passport validity rule for {{ travel_rule.destination }}
+          <span class="stamp {{ travel_rule.status|status_class }}">{{ travel_rule.status|status_text }}</span>
+        </div>
+        <div class="evidence-meta">
+          {% if travel_rule.passport_validity_months is none %}
+            No verified period. Verify it manually.
+          {% elif travel_rule.passport_validity_months == 0 %}
+            Valid through the return date. No extra months.
+          {% else %}
+            {{ travel_rule.passport_validity_months }} months beyond the return date.
+          {% endif %}
+          · Checked {{ travel_rule.checked_at|datefmt }}
+        </div>
+        <div class="evidence-meta">
+          Visa:
+          {% if travel_rule.visa_required is true %}{{ travel_rule.visa_type or 'Required' }}
+          {% elif travel_rule.visa_required is false %}No visa required according to the source
+          {% else %}Not stated in the source{% endif %}
+        </div>
+        {% if travel_rule.source_url %}
+        <div class="evidence-meta"><a href="{{ travel_rule.source_url }}" target="_blank" rel="noreferrer">{{ travel_rule.source_url }}</a></div>
+        {% else %}
+        <div class="evidence-meta">No official public source found. Verify manually.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% for doc_type, req in requirements.items() %}
+    <div class="evidence-item">
+      <div>
+        <div class="evidence-title">
+          {{ req.title }}
+          <span class="stamp {{ req.status|status_class }}">{{ req.status|status_text }}</span>
+        </div>
+        <div class="evidence-meta">
+          Fee: {{ req.fee or 'Not stated' }} · Processing: {{ req.processing_time or 'Not stated' }} · Checked {{ req.checked_at|datefmt }}
+        </div>
+        {% if req.official_url %}
+        <div class="evidence-meta"><a href="{{ req.official_url }}" target="_blank" rel="noreferrer">{{ req.official_url }}</a></div>
+        {% else %}
+        <div class="evidence-meta">No official public source found. Verify manually.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% if not requirements %}
+    <div class="empty">No requirements checked yet.</div>
+    {% endif %}
+  </div>
 </section>
 
 <section class="section">
@@ -108,44 +194,14 @@
 
 <section class="section">
   <div class="section-head">
-    <h2 class="section-title">Official evidence</h2>
-    <span class="section-note">{{ requirements|length }} checks</span>
-  </div>
-  <div class="evidence">
-    {% for doc_type, req in requirements.items() %}
-    <div class="evidence-item">
-      <div>
-        <div class="evidence-title">
-          {{ req.title }}
-          <span class="stamp {{ req.status|status_class }}">{{ req.status|status_text }}</span>
-        </div>
-        <div class="evidence-meta">
-          Fee: {{ req.fee or 'Not stated' }} · Processing: {{ req.processing_time or 'Not stated' }} · Checked {{ req.checked_at|datefmt }}
-        </div>
-        {% if req.official_url %}
-        <div class="evidence-meta"><a href="{{ req.official_url }}" target="_blank" rel="noreferrer">{{ req.official_url }}</a></div>
-        {% else %}
-        <div class="evidence-meta">No official public source found. Verify manually.</div>
-        {% endif %}
-      </div>
-    </div>
-    {% endfor %}
-    {% if not requirements %}
-    <div class="empty">No requirements checked yet.</div>
-    {% endif %}
-  </div>
-</section>
-
-<section class="section">
-  <div class="section-head">
-    <h2 class="section-title">Add a life event</h2>
+    <h2 class="section-title">Add an event</h2>
     <span class="section-note">The plan is built backward from the date.</span>
   </div>
   {% if settings.demo_read_only %}
   <div class="empty">The public demo is read-only. Run the project locally to add your own event or document.</div>
   {% else %}
   <div class="btn-row">
-    <a class="btn" href="/events/new">Add a trip</a>
+    <a class="btn" href="/events/new">Add an event</a>
     <a class="btn btn-secondary" href="/documents">Upload a document</a>
   </div>
   {% endif %}

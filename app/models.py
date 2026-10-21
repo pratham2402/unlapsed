@@ -117,13 +117,43 @@ class Event(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: str = Field(index=True)
-    event_type: str = "trip"
+    event_type: str = "auto"
     title: str
     destination: str = ""
+    destination_country: str = ""
+    home_location: str = ""
+    is_international: bool = False
+    event_type_confidence: float = 0.0
+    event_type_reason: str = ""
+    relevant_docs_json: str = "[]"
     depart_date: date | None = None
     return_date: date | None = None
     notes: str = ""
     created_at: datetime = Field(default_factory=utcnow)
+
+    @property
+    def relevant_doc_types(self) -> list[str]:
+        return _load_json(self.relevant_docs_json, [])
+
+
+class TravelRule(SQLModel, table=True):
+    __tablename__ = "travel_rules"
+
+    id: int | None = Field(default=None, primary_key=True)
+    destination: str = Field(index=True)
+    home_location: str = ""
+    passport_validity_months: int | None = None
+    rule_text: str = ""
+    visa_required: bool | None = None
+    visa_type: str = ""
+    visa_rule_text: str = ""
+    source_title: str = ""
+    source_url: str = ""
+    source_excerpt: str = ""
+    checked_at: datetime = Field(default_factory=utcnow)
+    confidence: float = 0.0
+    status: str = "needs_manual_check"
+    provider: str = "tavily"
 
 
 class Plan(SQLModel, table=True):
@@ -135,6 +165,8 @@ class Plan(SQLModel, table=True):
     title: str
     summary: str = ""
     status: str = "active"
+    # Legacy field kept for SQLite compatibility. The product no longer uses
+    # invented dollar risk; consequences are expressed as blocking or parallel.
     risk_total_cents: int = 0
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
@@ -157,6 +189,7 @@ class PlanTask(SQLModel, table=True):
     due_date: date | None = None
     depends_on_json: str = "[]"
     blocking: bool = True
+    # Legacy field kept for SQLite compatibility. Always zero in new plans.
     cost_of_missing_cents: int = 0
     priority: str = "medium"
     status: str = "todo"

@@ -763,7 +763,26 @@ a.section-note:hover {
   font-size: 11px;
 }
 
+.field-help {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.form-details {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+
+.form-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+
 input,
+select,
 textarea {
   width: 100%;
   padding: 10px 11px;
